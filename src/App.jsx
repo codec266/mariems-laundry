@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom"
 import AuthForm from "./components/AuthForm"
 import CustomerHome from "./pages/CustomerHome"
 import Profiles from "./pages/Profiles"
+import Orders from "./pages/Orders"
+import PlaceOrder from "./pages/PlaceOrder"
 
 export default function App() {
   return(
@@ -10,6 +12,8 @@ export default function App() {
         <Route path ="/" element={<AuthForm />} />
         <Route path ="/home" element={(<CustomerHome />)} />
         <Route path ="/profile" element={(<Profiles />)} />
+        <Route path ="/orders" element={(<Orders />)}/>
+        <Route path ="/place-order" element={<PlaceOrder />} />
       </Routes>
     </Router>
   )
