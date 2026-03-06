@@ -72,7 +72,10 @@ export default function CustomerHome() {
                 <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest">Profile</span>
               </button>
 
-              <button className="flex flex-col items-center justify-center aspect-square bg-[#97d5fc] hover:bg-[#74abcf] transition-colors rounded-xl p-4 text-white group">
+              <button 
+                onClick={() => navigate("/orders")}
+                className="flex flex-col items-center justify-center aspect-square bg-[#97d5fc] hover:bg-[#74abcf] transition-colors rounded-xl p-4 text-white group">
+                
                 <PlusCircle size={40} strokeWidth={2} className="mb-2" />
                 <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-center leading-tight">Place Order</span>
               </button>
