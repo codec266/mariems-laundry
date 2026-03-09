@@ -7,6 +7,7 @@ import PlaceOrder from "./pages/PlaceOrder"
 import AdminDashboard from "./pages/AdminDashboard"
 import AdminActiveOrders from "./pages/AdminActiveOrders"
 import AdminOrderHistory from "./pages/AdminOrderHistory"
+import AdminSalesReport from "./pages/AdminSalesReport"
 
 export default function App() {
   return(
@@ -20,6 +21,7 @@ export default function App() {
         <Route path ="/place-order" element={<PlaceOrder />} />
         <Route path="/admin-active-orders" element={<AdminActiveOrders />} />
         <Route path="/admin-order-history" element={<AdminOrderHistory />} />
+        <Route path="/admin-sales-report" element={<AdminSalesReport />} />
       </Routes>
     </Router>
   )
