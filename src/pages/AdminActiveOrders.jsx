@@ -218,7 +218,7 @@ export default function AdminActiveOrders() {
               return (
                 <div
                   key={order.id}
-                  className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-[32px] p-5 sm:p-6 md:p-8 flex flex-col lg:flex-row justify-between gap-6 md:gap-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
+                  className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-4xl p-5 sm:p-6 md:p-8 flex flex-col lg:flex-row justify-between gap-6 md:gap-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
                 >
                   {/* Left Side: Information */}
                   <div className="flex-1 flex flex-col justify-between gap-4 relative z-10 w-full">
