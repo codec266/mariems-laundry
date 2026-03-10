@@ -39,6 +39,7 @@ export default function AdminSalesReport() {
         id,
         date,
         weight_kg,
+        delivery_fee,
         total_amount,
         order_status,
         customers(first_name,last_name),
@@ -108,12 +109,13 @@ export default function AdminSalesReport() {
   const handleLogout = async () => { await supabase.auth.signOut(); navigate("/"); };
   const formatMoney = v => `₱${Number(v).toFixed(2)}`;
 
-  // Export CSV
+  // export csv
   const exportCSV = () => {
-    const headers = ["Customer", "Service", "Weight", "Total", "Date", "Address"];
+    const headers = ["Customer", "Service", "Weight", "Delivery Fee", "Total", "Date", "Address"];
     const rows = filteredOrders.map(o => {
       const customer = `${o.customers?.first_name || ""} ${o.customers?.last_name || ""}`;
       const service = o.service_types?.service_name || "Other";
+      const delivery = o.delivery_fee || 0;
       const address = o.addresses ? [
         o.addresses.building_no,
         o.addresses.street,
@@ -122,7 +124,7 @@ export default function AdminSalesReport() {
         o.addresses.zip_code
       ].filter(Boolean).join(", ") : "";
 
-      return [customer, service, o.weight_kg, o.total_amount, new Date(o.date).toLocaleDateString(), `"${address}"`];
+      return [customer, service, o.weight_kg, delivery, o.total_amount, new Date(o.date).toLocaleDateString(), `"${address}"`];
     });
     const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
 
@@ -252,12 +254,13 @@ export default function AdminSalesReport() {
 
         {/* TABLE */}
         <div className="w-full overflow-x-auto rounded-2xl border border-[#e1f0fa] shadow-sm bg-white mb-8">
-          <table className="w-full min-w-150 text-left text-sm text-[#5a98bd]">
+          <table className="w-full min-w-175 text-left text-sm text-[#5a98bd]">
             <thead className="bg-[#f4faff] text-[#74abcf] uppercase font-black text-xs border-b border-[#e1f0fa]">
               <tr>
                 <th className="py-4 px-4 md:px-6">Customer</th>
                 <th className="py-4 px-4 md:px-6">Service</th>
                 <th className="py-4 px-4 md:px-6 text-center">Weight</th>
+                <th className="py-4 px-4 md:px-6 text-center">Delivery</th>
                 <th className="py-4 px-4 md:px-6 text-center">Total</th>
                 <th className="py-4 px-4 md:px-6">Date</th>
                 <th className="py-4 px-4 md:px-6">Address</th>
@@ -265,16 +268,21 @@ export default function AdminSalesReport() {
             </thead>
             <tbody className="font-medium">
               {loading ? (
-                <tr><td colSpan={6} className="text-center py-10 text-[#97d5fc] font-bold animate-pulse">Loading report...</td></tr>
+                <tr><td colSpan={7} className="text-center py-10 text-[#97d5fc] font-bold animate-pulse">Loading report...</td></tr>
               ) : filteredOrders.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-10 text-[#5a98bd] font-bold bg-[#f4faff]">No sales records found for this period.</td></tr>
+                <tr><td colSpan={7} className="text-center py-10 text-[#5a98bd] font-bold bg-[#f4faff]">No sales records found for this period.</td></tr>
               ) : (
                 filteredOrders.map(order => (
                   <tr key={order.id} className="border-b border-[#e1f0fa] hover:bg-[#f9fcff] transition-colors last:border-0">
                     <td className="py-4 px-4 md:px-6 text-[#74abcf] font-bold whitespace-nowrap">{order.customers?.first_name} {order.customers?.last_name}</td>
                     <td className="py-4 px-4 md:px-6 whitespace-nowrap">{order.service_types?.service_name}</td>
                     <td className="py-4 px-4 md:px-6 text-center whitespace-nowrap">{order.weight_kg} kg</td>
-                    <td className="py-4 px-4 md:px-6 text-[#74abcf] font-bold text-center whitespace-nowrap">₱{Number(order.total_amount).toFixed(2)}</td>
+                    <td className="py-4 px-4 md:px-6 text-center whitespace-nowrap text-[#97d5fc]">
+                      ₱{Number(order.delivery_fee || 0).toFixed(2)}
+                    </td>
+                    <td className="py-4 px-4 md:px-6 text-[#74abcf] font-black text-center whitespace-nowrap">
+                      ₱{Number(order.total_amount).toFixed(2)}
+                    </td>
                     <td className="py-4 px-4 md:px-6 text-[#74abcf] font-bold whitespace-nowrap">{new Date(order.date).toLocaleDateString()}</td>
                     <td className="py-4 px-4 md:px-6 text-xs text-[#97d5fc] truncate max-w-37.5 md:max-w-62.5" title={order.addresses && [
                         order.addresses.building_no,
