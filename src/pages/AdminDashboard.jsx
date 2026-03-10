@@ -154,7 +154,7 @@ export default function AdminDashboard() {
         {/* QUICK STATS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-[32px] p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-4xl p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
             <div className="absolute -right-4 -top-4 text-[#e1f0fa] group-hover:text-[#abddfc] transition-colors opacity-50">
               <Clock size={120} strokeWidth={1} />
             </div>
@@ -164,7 +164,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-[32px] p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-4xl p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
              <div className="absolute -right-4 -top-4 text-[#e1f0fa] group-hover:text-[#abddfc] transition-colors opacity-50">
               <Package size={120} strokeWidth={1} />
             </div>
@@ -174,7 +174,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-[32px] p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-4xl p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
              <div className="absolute -right-4 -top-4 text-[#e1f0fa] group-hover:text-[#abddfc] transition-colors opacity-50">
               <TrendingUp size={120} strokeWidth={1} />
             </div>
@@ -187,7 +187,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* PENDING ORDERS */}
-        <div className="bg-white border-2 border-[#e1f0fa] rounded-[32px] p-6 md:p-8 flex-1 flex flex-col">
+        <div className="bg-white border-2 border-[#e1f0fa] rounded-4xl p-6 md:p-8 flex-1 flex flex-col">
 
           {/* Header & Refresh Button */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
