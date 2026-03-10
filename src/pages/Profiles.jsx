@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useNavigate, useLocation } from "react-router-dom";
-import { User, ArrowLeft, Save, Mail, MapPin, ShieldCheck, Trash2, Edit2, Plus, X, Phone } from "lucide-react";
+import { User, ArrowLeft, Save, Mail, MapPin, ShieldCheck, Trash2, Edit2, Plus, X, Phone, CheckCircle, AlertTriangle, Lock, Key } from "lucide-react";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -12,8 +12,12 @@ export default function Profile() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState(""); // <-- ADDED PHONE STATE FOR UI
+  const [phone, setPhone] = useState(""); 
   const [loading, setLoading] = useState(false);
+
+  // security (password)
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
 
   // addresses
   const [addressName, setAddressName] = useState("");
@@ -26,6 +30,15 @@ export default function Profile() {
   const [editingAddressId, setEditingAddressId] = useState(null);
   const [showAddAddressForm, setShowAddAddressForm] = useState(false);
 
+  // UI Polish: Notifications & Modals
+  const [notification, setNotification] = useState(null); // { type: 'success' | 'error', message: '' }
+  const [confirmDialog, setConfirmDialog] = useState(null); // { title, message, onConfirm }
+
+  const showNotification = (message, type = "success") => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
   // fetch profile and addresses
   useEffect(() => {
     const fetchProfile = async () => {
@@ -34,7 +47,7 @@ export default function Profile() {
 
       setEmail(user.email);
 
-      // fetch only active addresses
+      // fetch active addresses
       const { data: addressData } = await supabase
         .from("addresses")
         .select("*")
@@ -44,7 +57,7 @@ export default function Profile() {
 
       if (addressData) setAddresses(addressData);
 
-      // fetch customer name
+      // fetch customer name & phone
       const { data } = await supabase
         .from("customers")
         .select("first_name, last_name")
@@ -54,7 +67,6 @@ export default function Profile() {
       if (data) {
         setFirstName(data.first_name || "");
         setLastName(data.last_name || "");
-        setPhone(data.phone || "");
       }
 
       if (location.state?.tab) {
@@ -67,36 +79,31 @@ export default function Profile() {
     fetchProfile();
   }, [navigate, location.state]);
 
-  // soft-delete address
-  const handleDeleteAddress = async (addressId) => {
-    if (!window.confirm("Are you sure you want to delete this address?")) return;
-
+  // Execute actual deletion after confirmation
+  const executeDeleteAddress = async (addressId) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Check if this address is used in any order
     const { data: linkedOrders, error: orderCheckError } = await supabase
       .from("orders")
       .select("id, order_status")
       .eq("address_id", addressId);
 
     if (orderCheckError) {
-      console.error("Order check error:", orderCheckError.message);
-      alert("Unable to check orders. Try again.");
+      showNotification("Unable to check orders. Try again.", "error");
       return;
     }
 
     if (linkedOrders && linkedOrders.length > 0) {
-      // If linked to active orders, prevent deletion
       const activeStatuses = ["Pending", "In Progress", "Out for Delivery", "Ready for Pickup"];
       const hasActive = linkedOrders.some(order => activeStatuses.includes(order.order_status));
 
       if (hasActive) {
-        alert("Cannot delete this address. It is linked to an active order.");
+        showNotification("Cannot delete this address. It is linked to an active order.", "error");
         return;
       }
 
-      // Otherwise, soft delete for historical orders
+      // Soft delete for historical orders
       const { error: softDeleteError } = await supabase
         .from("addresses")
         .update({ is_active: false })
@@ -104,15 +111,14 @@ export default function Profile() {
         .eq("customer_id", user.id);
 
       if (!softDeleteError) {
-        setAddresses(addresses.filter(addr => addr.id !== addressId)); // remove from UI
-        alert("Address removed successfully.");
+        setAddresses(addresses.filter(addr => addr.id !== addressId));
+        showNotification("Address removed successfully.", "success");
       } else {
-        console.error("Soft delete error:", softDeleteError.message);
-        alert("Failed to remove address. See console.");
+        showNotification("Failed to remove address.", "error");
       }
 
     } else {
-      // No orders linked — safe to hard delete
+      // Hard delete
       const { error: hardDeleteError } = await supabase
         .from("addresses")
         .delete()
@@ -121,12 +127,19 @@ export default function Profile() {
 
       if (!hardDeleteError) {
         setAddresses(addresses.filter(addr => addr.id !== addressId));
-        alert("Address deleted successfully.");
+        showNotification("Address deleted successfully.", "success");
       } else {
-        console.error("Hard delete error:", hardDeleteError.message);
-        alert("Failed to delete address. See console.");
+        showNotification("Failed to delete address.", "error");
       }
     }
+  };
+
+  const handleDeleteAddress = (addressId) => {
+    setConfirmDialog({
+      title: "Delete Address",
+      message: "Are you sure you want to remove this address? This action cannot be undone.",
+      onConfirm: () => executeDeleteAddress(addressId)
+    });
   };
 
   const handleUpdate = async (e) => {
@@ -135,25 +148,55 @@ export default function Profile() {
 
     const { data: { user } } = await supabase.auth.getUser();
 
-    // update account info
+    // UPDATE ACCOUNT INFO
     if (activeTab === "account") {
       const { error } = await supabase
         .from("customers")
         .update({ 
           first_name: firstName, 
           last_name: lastName,
-          phone: phone // <-- ADDED PHONE TO UPDATE PAYLOAD
         })
         .eq("id", user.id);
 
       setLoading(false);
-      if (!error) alert("Account info updated successfully!");
+      if (!error) {
+        showNotification("Account info updated successfully!", "success");
+      } else {
+        showNotification("Failed to update profile.", "error");
+      }
     }
 
-    // add or edit address
+    // UPDATE PASSWORD
+    if (activeTab === "security") {
+      if (newPassword !== confirmNewPassword) {
+        showNotification("New passwords do not match.", "error");
+        setLoading(false);
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        showNotification("Password must be at least 6 characters.", "error");
+        setLoading(false);
+        return;
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      setLoading(false);
+      if (!error) {
+        showNotification("Password updated successfully!", "success");
+        setNewPassword("");
+        setConfirmNewPassword("");
+      } else {
+        showNotification(error.message, "error");
+      }
+    }
+
+    // ADD OR EDIT ADDRESS
     if (activeTab === "addresses") {
       if (editingAddressId) {
-        // UPDATE
         const { error } = await supabase
           .from("addresses")
           .update({
@@ -168,13 +211,12 @@ export default function Profile() {
           .eq("id", editingAddressId)
           .eq("customer_id", user.id);
 
-        if (!error) alert("Address updated successfully!");
-        else console.error("Update error:", error.message);
+        if (!error) showNotification("Address updated successfully!", "success");
+        else showNotification("Failed to update address.", "error");
 
         setEditingAddressId(null);
         setShowAddAddressForm(false);
       } else {
-        // INSERT
         const { error } = await supabase
           .from("addresses")
           .insert([{
@@ -187,10 +229,11 @@ export default function Profile() {
             province: province,
             is_active: true
           }]);
-        if (!error) alert("Address added successfully!");
+          
+        if (!error) showNotification("Address added successfully!", "success");
+        else showNotification("Failed to add address.", "error");
       }
 
-      // refresh active addresses
       const { data } = await supabase
         .from("addresses")
         .select("*")
@@ -200,13 +243,7 @@ export default function Profile() {
 
       setAddresses(data);
 
-      // reset form
-      setAddressName("");
-      setBuildingNo("");
-      setStreet("");
-      setCity("");
-      setZipCode("");
-      setProvince("");
+      setAddressName(""); setBuildingNo(""); setStreet(""); setCity(""); setZipCode(""); setProvince("");
       setShowAddAddressForm(false);
       setLoading(false);
     }
@@ -214,14 +251,46 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#abddfc] p-4 md:p-10 font-sans">
+      
+      {/* CONFIRMATION MODAL */}
+      {confirmDialog && (
+        <div className="fixed inset-0 bg-[#5a98bd]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-4xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center text-center gap-4 border-2 border-[#e1f0fa] animate-in zoom-in-95 duration-200">
+            <div className="bg-rose-50 text-rose-400 p-4 rounded-full mb-2">
+              <AlertTriangle size={36} strokeWidth={2.5} />
+            </div>
+            <h3 className="text-2xl font-black text-[#74abcf] uppercase tracking-tighter">{confirmDialog.title}</h3>
+            <p className="text-[#5a98bd] font-medium text-sm leading-relaxed">{confirmDialog.message}</p>
+            <div className="flex w-full gap-3 mt-4">
+              <button 
+                onClick={() => setConfirmDialog(null)} 
+                className="flex-1 bg-white border-2 border-[#e1f0fa] hover:bg-[#f4faff] text-[#97d5fc] px-4 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-sm active:scale-95"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => { confirmDialog.onConfirm(); setConfirmDialog(null); }} 
+                className="flex-1 bg-rose-400 hover:bg-rose-500 text-white px-4 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-sm active:scale-95"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white w-full max-w-5xl min-h-150 rounded-[40px] shadow-2xl overflow-hidden flex flex-col md:flex-row border-2 border-[#e1f0fa]">
 
         {/* LEFT SIDEBAR */}
         <div className="flex w-full md:w-2/5 flex-col items-center justify-start bg-[#f4faff] p-8 md:p-10 border-r-2 border-[#e1f0fa]">
+          
           <div className="w-24 h-24 md:w-32 md:h-32 bg-[#97d5fc] rounded-4xl flex items-center justify-center text-white shadow-inner mb-6 transform rotate-3 transition-transform hover:rotate-0">
             <User size={50} strokeWidth={2} />
           </div>
-          <h3 className="text-[#74abcf] text-2xl font-black uppercase tracking-tighter mb-2 text-center">{firstName}'s Profile</h3>
+
+          <h3 className="text-[#74abcf] text-2xl font-black uppercase tracking-tighter mb-2 text-center">
+            {firstName}'s Profile
+          </h3>
           <p className="text-[#97d5fc] font-bold text-sm mb-8 text-center truncate w-full px-4">{email}</p>
 
           {/* Tabs */}
@@ -234,6 +303,16 @@ export default function Profile() {
             >
               <ShieldCheck size={18} strokeWidth={2.5} /> Account Info
             </button>
+            
+            <button 
+              onClick={() => { setActiveTab("security"); setShowAddAddressForm(false); setEditingAddressId(null); }}
+              className={`w-full flex items-center gap-3 px-6 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${
+                activeTab === "security" ? "bg-[#74abcf] text-white shadow-md scale-105" : "bg-white text-[#97d5fc] hover:text-[#74abcf] hover:bg-[#e1f0fa] border-2 border-[#e1f0fa]"
+              }`}
+            >
+              <Lock size={18} strokeWidth={2.5} /> Security
+            </button>
+
             <button 
               onClick={() => setActiveTab("addresses")}
               className={`w-full flex items-center gap-3 px-6 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${
@@ -247,6 +326,7 @@ export default function Profile() {
 
         {/* RIGHT SIDE: MAIN CONTENT */}
         <div className="w-full md:w-3/5 flex flex-col p-8 md:p-12 bg-white relative">
+          
           <button 
             type="button"
             onClick={() => navigate("/home")}
@@ -255,9 +335,19 @@ export default function Profile() {
             <ArrowLeft size={24} strokeWidth={3} />
           </button>
 
-          <form onSubmit={handleUpdate} className="flex-1 flex flex-col justify-center mt-12 md:mt-8">
+          <form onSubmit={handleUpdate} className="flex-1 flex flex-col justify-center mt-12 md:mt-4">
 
-            {/* ACCOUNT INFO */}
+            {/* NOTIFICATION BANNER */}
+            {notification && (
+              <div className={`mb-6 p-4 rounded-2xl border-2 flex items-center gap-3 text-sm font-bold animate-in slide-in-from-top-2 fade-in ${
+                notification.type === "success" ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-rose-50 border-rose-200 text-rose-500"
+              }`}>
+                {notification.type === "success" ? <CheckCircle size={20} className="shrink-0" /> : <AlertTriangle size={20} className="shrink-0" />}
+                <p>{notification.message}</p>
+              </div>
+            )}
+
+            {/* ================= ACCOUNT INFO TAB ================= */}
             {activeTab === "account" && (
               <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                 <h2 className="text-3xl font-black text-[#74abcf] uppercase tracking-tighter mb-8">Account Info</h2>
@@ -274,11 +364,23 @@ export default function Profile() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="space-y-1">
                       <label className="text-[#74abcf] text-[10px] font-black uppercase tracking-widest ml-1">First Name</label>
-                      <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full px-4 py-3 border-2 border-[#e1f0fa] rounded-2xl text-[#5a98bd] font-bold outline-none focus:border-[#abddfc] focus:bg-[#f4faff] transition-colors shadow-sm" required />
+                      <input 
+                        type="text" 
+                        value={firstName} 
+                        onChange={(e) => setFirstName(e.target.value)} 
+                        className="w-full px-4 py-3 border-2 border-[#e1f0fa] rounded-2xl text-[#5a98bd] font-bold outline-none focus:border-[#abddfc] focus:bg-[#f4faff] transition-colors shadow-sm" 
+                        required
+                      />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[#74abcf] text-[10px] font-black uppercase tracking-widest ml-1">Last Name</label>
-                      <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full px-4 py-3 border-2 border-[#e1f0fa] rounded-2xl text-[#5a98bd] font-bold outline-none focus:border-[#abddfc] focus:bg-[#f4faff] transition-colors shadow-sm" required />
+                      <input 
+                        type="text" 
+                        value={lastName} 
+                        onChange={(e) => setLastName(e.target.value)} 
+                        className="w-full px-4 py-3 border-2 border-[#e1f0fa] rounded-2xl text-[#5a98bd] font-bold outline-none focus:border-[#abddfc] focus:bg-[#f4faff] transition-colors shadow-sm" 
+                        required
+                      />
                     </div>
                   </div>
 
@@ -303,30 +405,83 @@ export default function Profile() {
                   </div>
                 </div>
 
-                <button type="submit" disabled={loading} className="w-full flex items-center justify-center gap-2 mt-8 bg-[#97d5fc] hover:bg-[#74abcf] disabled:bg-[#e1f0fa] text-white px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-md active:scale-95">
-                  <Save size={18} strokeWidth={2.5} /> {loading ? "Saving Changes..." : "Update Information"}
+                <button type="submit" disabled={loading} className="w-full flex items-center justify-center gap-2 mt-8 bg-[#97d5fc] hover:bg-[#74abcf] disabled:bg-[#e1f0fa] disabled:active:scale-100 text-white px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-md active:scale-95">
+                  <Save size={18} strokeWidth={2.5} />
+                  {loading ? "Saving Changes..." : "Update Information"}
                 </button>
               </div>
             )}
 
-            {/* ADDRESSES */}
+            {/* ================= SECURITY TAB ================= */}
+            {activeTab === "security" && (
+              <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                <h2 className="text-3xl font-black text-[#74abcf] uppercase tracking-tighter mb-8">Security</h2>
+                
+                <div className="space-y-5">
+                  <div className="space-y-1">
+                    <label className="text-[#74abcf] text-[10px] font-black uppercase tracking-widest ml-1">New Password</label>
+                    <div className="relative">
+                      <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-[#97d5fc]" size={18} strokeWidth={2.5} />
+                      <input 
+                        type="password" 
+                        placeholder="Enter new password"
+                        value={newPassword} 
+                        onChange={(e) => setNewPassword(e.target.value)} 
+                        className="w-full pl-12 pr-4 py-3 border-2 border-[#e1f0fa] rounded-2xl text-[#5a98bd] font-bold outline-none focus:border-[#abddfc] focus:bg-[#f4faff] transition-colors shadow-sm placeholder:text-[#b8dcf2] placeholder:font-medium" 
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[#74abcf] text-[10px] font-black uppercase tracking-widest ml-1">Confirm New Password</label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[#97d5fc]" size={18} strokeWidth={2.5} />
+                      <input 
+                        type="password" 
+                        placeholder="Re-enter new password"
+                        value={confirmNewPassword} 
+                        onChange={(e) => setConfirmNewPassword(e.target.value)} 
+                        className="w-full pl-12 pr-4 py-3 border-2 border-[#e1f0fa] rounded-2xl text-[#5a98bd] font-bold outline-none focus:border-[#abddfc] focus:bg-[#f4faff] transition-colors shadow-sm placeholder:text-[#b8dcf2] placeholder:font-medium" 
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <button type="submit" disabled={loading} className="w-full flex items-center justify-center gap-2 mt-8 bg-[#74abcf] hover:bg-[#5a98bd] disabled:bg-[#e1f0fa] disabled:active:scale-100 text-white px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-md active:scale-95">
+                  <Save size={18} strokeWidth={2.5} />
+                  {loading ? "Updating..." : "Change Password"}
+                </button>
+              </div>
+            )}
+
+            {/* ================= ADDRESSES TAB ================= */}
             {activeTab === "addresses" && (
               <div className="animate-in fade-in slide-in-from-right-4 duration-300 flex flex-col h-full">
 
                 <div className="flex justify-between items-end mb-6">
                   <h2 className="text-3xl font-black text-[#74abcf] uppercase tracking-tighter leading-none">Saved Addresses</h2>
+                  
                   {!showAddAddressForm && editingAddressId === null && (
-                    <button type="button" onClick={() => setShowAddAddressForm(true)} className="flex items-center gap-1 bg-white border-2 border-[#abddfc] hover:bg-[#f4faff] text-[#74abcf] px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-sm active:scale-95">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddAddressForm(true)}
+                      className="flex items-center gap-1 bg-white border-2 border-[#abddfc] hover:bg-[#f4faff] text-[#74abcf] px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-sm active:scale-95"
+                    >
                       <Plus size={16} strokeWidth={3} /> Add New
                     </button>
                   )}
                 </div>
 
-                {/* Addresses List */}
+                {/* Saved Addresses List */}
                 {addresses.length > 0 && !showAddAddressForm && editingAddressId === null && (
                   <div className="space-y-4 mb-6">
                     {addresses.map((addr) => (
-                      <div key={addr.id} className="bg-[#f4faff] border-2 border-[#e1f0fa] hover:border-[#abddfc] rounded-2xl p-5 flex justify-between items-start transition-colors group">
+                      <div
+                        key={addr.id}
+                        className="bg-[#f4faff] border-2 border-[#e1f0fa] hover:border-[#abddfc] rounded-2xl p-5 flex justify-between items-start transition-colors group"
+                      >
                         <div>
                           <p className="font-black text-[#74abcf] text-lg uppercase tracking-tight mb-1 flex items-center gap-2">
                             <MapPin size={16} className="text-[#97d5fc]"/> {addr.name}
@@ -336,20 +491,31 @@ export default function Profile() {
                             {addr.city}, {addr.province} {addr.zip_code}
                           </p>
                         </div>
+                        
                         <div className="flex flex-col sm:flex-row gap-2">
-                          <button type="button" onClick={() => {
-                            setAddressName(addr.name);
-                            setBuildingNo(addr.building_no);
-                            setStreet(addr.street);
-                            setCity(addr.city);
-                            setZipCode(addr.zip_code || "");
-                            setProvince(addr.province);
-                            setEditingAddressId(addr.id);
-                            setShowAddAddressForm(true);
-                          }} className="bg-white border-2 border-[#e1f0fa] hover:border-[#abddfc] text-[#74abcf] p-2 rounded-xl transition-all shadow-sm active:scale-90" title="Edit Address">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAddressName(addr.name);
+                              setBuildingNo(addr.building_no);
+                              setStreet(addr.street);
+                              setCity(addr.city);
+                              setZipCode(addr.zip_code || "");
+                              setProvince(addr.province);
+                              setEditingAddressId(addr.id);
+                              setShowAddAddressForm(true);
+                            }}
+                            className="bg-white border-2 border-[#e1f0fa] hover:border-[#abddfc] text-[#74abcf] p-2 rounded-xl transition-all shadow-sm active:scale-90"
+                            title="Edit Address"
+                          >
                             <Edit2 size={16} strokeWidth={2.5} />
                           </button>
-                          <button type="button" onClick={() => handleDeleteAddress(addr.id)} className="bg-white border-2 border-rose-100 hover:border-rose-300 text-rose-400 p-2 rounded-xl transition-all shadow-sm active:scale-90" title="Delete Address">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAddress(addr.id)}
+                            className="bg-white border-2 border-rose-100 hover:border-rose-300 text-rose-400 p-2 rounded-xl transition-all shadow-sm active:scale-90"
+                            title="Delete Address"
+                          >
                             <Trash2 size={16} strokeWidth={2.5} />
                           </button>
                         </div>
@@ -369,11 +535,15 @@ export default function Profile() {
                 {/* Add/Edit Form */}
                 {(showAddAddressForm || editingAddressId !== null) && (
                   <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-3xl p-6 space-y-4 shadow-inner">
-                    <h3 className="text-[#74abcf] font-black uppercase tracking-widest text-sm mb-2">{editingAddressId ? "Edit Address" : "New Address Details"}</h3>
+                    <h3 className="text-[#74abcf] font-black uppercase tracking-widest text-sm mb-2">
+                      {editingAddressId ? "Edit Address" : "New Address Details"}
+                    </h3>
+                    
                     <div className="space-y-1">
                       <label className="text-[#97d5fc] text-[10px] font-black uppercase tracking-widest ml-1">Label (e.g., Home, Office)</label>
                       <input type="text" value={addressName} onChange={(e) => setAddressName(e.target.value)} className="w-full px-4 py-3 border-2 border-white focus:border-[#abddfc] text-[#5a98bd] font-bold rounded-2xl outline-none shadow-sm transition-colors" required />
                     </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[#97d5fc] text-[10px] font-black uppercase tracking-widest ml-1">Building / Unit No.</label>
@@ -396,20 +566,30 @@ export default function Profile() {
                         <input type="text" value={zipCode} onChange={(e) => setZipCode(e.target.value)} className="w-full px-4 py-3 border-2 border-white focus:border-[#abddfc] text-[#5a98bd] font-bold rounded-2xl outline-none shadow-sm transition-colors" />
                       </div>
                     </div>
+
                     <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                      <button type="submit" disabled={loading} className="flex-1 flex items-center justify-center gap-2 bg-[#97d5fc] hover:bg-[#74abcf] disabled:bg-[#e1f0fa] text-white px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-md active:scale-95">
-                        <Save size={16} strokeWidth={3} /> {loading ? "Saving..." : editingAddressId ? "Update Address" : "Save Address"}
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="flex-1 flex items-center justify-center gap-2 bg-[#97d5fc] hover:bg-[#74abcf] disabled:bg-[#e1f0fa] text-white px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-md active:scale-95"
+                      >
+                        <Save size={16} strokeWidth={3} />
+                        {loading ? "Saving..." : editingAddressId ? "Update Address" : "Save Address"}
                       </button>
-                      <button type="button" onClick={() => {
-                        setShowAddAddressForm(false);
-                        setEditingAddressId(null);
-                        setAddressName("");
-                        setBuildingNo("");
-                        setStreet("");
-                        setCity("");
-                        setZipCode("");
-                        setProvince("");
-                      }} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white border-2 border-[#e1f0fa] hover:bg-gray-50 text-gray-400 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-sm active:scale-95">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddAddressForm(false);
+                          setEditingAddressId(null);
+                          setAddressName("");
+                          setBuildingNo("");
+                          setStreet("");
+                          setCity("");
+                          setZipCode("");
+                          setProvince("");
+                        }}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white border-2 border-[#e1f0fa] hover:bg-gray-50 text-gray-400 px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-sm active:scale-95"
+                      >
                         <X size={16} strokeWidth={3} /> Cancel
                       </button>
                     </div>
