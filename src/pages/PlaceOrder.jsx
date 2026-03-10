@@ -35,7 +35,7 @@ export default function PlaceOrder() {
   // Derived
   const activeService = services.find(s => s.id === selectedService) || { price_per_8kg: 0 };
   const blocks = Math.ceil(weight / 8);
-  const deliveryFee = orderMethod === "delivery" ? 40 : 0; // Updated to 40 pesos
+  const deliveryFee = orderMethod === "delivery" ? 40 : 0; 
   const calculatedTotal = blocks * Number(activeService.price_per_8kg) + deliveryFee;
 
   // fetch user info and addresses
@@ -99,7 +99,7 @@ export default function PlaceOrder() {
         service_type_id: selectedService,
         weight_kg: weight,
         total_amount: calculatedTotal,
-        delivery_fee: deliveryFee,        // ✅ Add delivery_fee
+        delivery_fee: deliveryFee,        
         order_status: "Pending",
         payment_status: "Unpaid",
         date: new Date().toISOString(),
@@ -166,12 +166,12 @@ export default function PlaceOrder() {
       </div>
 
       {/* ================= MAIN CONTENT ================= */}
-      <div className="flex-1 bg-white rounded-[40px] shadow-2xl p-8 md:p-10 flex flex-col relative overflow-hidden">
+      <div className="flex-1 bg-white rounded-[40px] shadow-2xl p-5 md:p-10 flex flex-col relative overflow-hidden">
         
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex items-center gap-4 mb-6 md:mb-8">
           <button onClick={() => navigate("/orders")} className="text-[#97d5fc] hover:text-[#74abcf] hover:-translate-x-1 transition-all">
-            <ArrowLeft size={36} strokeWidth={3}/>
+            <ArrowLeft size={32} strokeWidth={3}/>
           </button>
           <h1 className="text-4xl md:text-5xl font-black text-[#74abcf] uppercase tracking-tighter">
             Place Order
@@ -179,15 +179,15 @@ export default function PlaceOrder() {
         </div>
 
         {/* Scrollable Content Area */}
-        <div className="flex-1 space-y-8 pb-32"> 
+        <div className="flex-1 space-y-6 md:space-y-8 pb-48 md:pb-32"> 
 
           {/* SECTION 1 & 2 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             
             {/* Service Type */}
-            <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-6 md:p-8">
-              <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-xl">1. Service Type</h2>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-5 md:p-8">
+              <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-lg md:text-xl">1. Service Type</h2>
+              <div className="grid grid-cols-2 gap-3 md:gap-4">
                 {services.map(service => {
                   const Icon = serviceIcons[service.id] || Shirt;
                   const isActive = selectedService === service.id;
@@ -196,14 +196,14 @@ export default function PlaceOrder() {
                     <button
                       key={service.id}
                       onClick={() => setSelectedService(service.id)}
-                      className={`bg-white rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-3 transition-all border-4 shadow-sm active:scale-95 ${
+                      className={`bg-white rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 md:gap-3 transition-all border-4 shadow-sm active:scale-95 ${
                         isActive 
                           ? 'border-[#74abcf] text-[#74abcf] shadow-md bg-[#f9fcff]' 
                           : 'border-[#e1f0fa] text-[#97d5fc] hover:border-[#abddfc] hover:text-[#74abcf]'
                       }`}
                     >
-                      <Icon size={40} strokeWidth={isActive ? 2.5 : 2} />
-                      <span className="font-black text-sm uppercase tracking-tight leading-tight">
+                      <Icon size={36} strokeWidth={isActive ? 2.5 : 2} />
+                      <span className="font-black text-[11px] md:text-sm uppercase tracking-tight leading-tight">
                         {service.service_name}
                       </span>
                     </button>
@@ -213,23 +213,23 @@ export default function PlaceOrder() {
             </div>
 
             {/* Order Method */}
-            <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-6 md:p-8">
-              <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-xl">2. Order Method</h2>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-5 md:p-8">
+              <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-lg md:text-xl">2. Order Method</h2>
+              <div className="grid grid-cols-2 gap-3 md:gap-4">
                 {orderMethods.map(method => {
                   const Icon = method.icon;
                   const isActive = orderMethod === method.id;
                   return (
                     <button 
                       key={method.id} onClick={() => setOrderMethod(method.id)}
-                      className={`bg-white rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-3 transition-all border-4 shadow-sm active:scale-95 ${
+                      className={`bg-white rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 md:gap-3 transition-all border-4 shadow-sm active:scale-95 ${
                         isActive 
                           ? 'border-[#74abcf] text-[#74abcf] shadow-md bg-[#f9fcff]' 
                           : 'border-[#e1f0fa] text-[#97d5fc] hover:border-[#abddfc] hover:text-[#74abcf]'
                       }`}
                     >
-                      <Icon size={40} strokeWidth={isActive ? 2.5 : 2} />
-                      <span className="font-black text-sm uppercase tracking-tight leading-tight">{method.name}</span>
+                      <Icon size={36} strokeWidth={isActive ? 2.5 : 2} />
+                      <span className="font-black text-[11px] md:text-sm uppercase tracking-tight leading-tight">{method.name}</span>
                     </button>
                   );
                 })}
@@ -238,35 +238,35 @@ export default function PlaceOrder() {
           </div>
 
           {/* SECTION 3 & 4 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             
             {/* Weight */}
-            <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-6 md:p-8 flex flex-col">
-              <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-xl">3. Laundry Weight (kg)</h2>
+            <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-5 md:p-8 flex flex-col">
+              <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-lg md:text-xl">3. Laundry Weight (kg)</h2>
               <div className="flex-1 flex flex-col items-center justify-center gap-6 py-4">
-                <div className="flex items-center gap-6 bg-white py-4 px-6 rounded-full shadow-sm border-2 border-[#e1f0fa]">
-                  <button onClick={() => setWeight(w => Math.max(1, w-1))} className="bg-[#f4faff] text-[#74abcf] p-4 rounded-full hover:bg-[#abddfc] hover:text-white transition-colors active:scale-90 border-2 border-[#e1f0fa]">
-                    <Minus size={24} strokeWidth={3}/>
+                <div className="flex items-center gap-4 sm:gap-6 bg-white py-3 px-4 sm:py-4 sm:px-6 rounded-full shadow-sm border-2 border-[#e1f0fa]">
+                  <button onClick={() => setWeight(w => Math.max(1, w-1))} className="bg-[#f4faff] text-[#74abcf] p-3 sm:p-4 rounded-full hover:bg-[#abddfc] hover:text-white transition-colors active:scale-90 border-2 border-[#e1f0fa]">
+                    <Minus size={20} strokeWidth={3}/>
                   </button>
-                  <span className="text-5xl font-black text-[#74abcf] w-24 text-center tabular-nums">{weight}</span>
-                  <button onClick={() => setWeight(w => w+1)} className="bg-[#97d5fc] text-white p-4 rounded-full hover:bg-[#74abcf] transition-colors active:scale-90 border-2 border-[#97d5fc]">
-                    <Plus size={24} strokeWidth={3}/>
+                  <span className="text-4xl sm:text-5xl font-black text-[#74abcf] w-20 sm:w-24 text-center tabular-nums">{weight}</span>
+                  <button onClick={() => setWeight(w => w+1)} className="bg-[#97d5fc] text-white p-3 sm:p-4 rounded-full hover:bg-[#74abcf] transition-colors active:scale-90 border-2 border-[#97d5fc]">
+                    <Plus size={20} strokeWidth={3}/>
                   </button>
                 </div>
-                <p className="text-xs font-bold text-[#97d5fc] uppercase tracking-widest bg-white px-4 py-2 rounded-xl border border-[#e1f0fa]">
+                <p className="text-[10px] md:text-xs font-bold text-[#97d5fc] uppercase tracking-widest bg-white px-4 py-2 rounded-xl border border-[#e1f0fa]">
                   Min charge ₱165 per 8kg
                 </p>
               </div>
             </div>
 
             {/* Address */}
-            <div className={`rounded-3xl p-6 md:p-8 flex flex-col transition-all border ${
+            <div className={`rounded-3xl p-5 md:p-8 flex flex-col transition-all border ${
               orderMethod === 'delivery' 
                 ? 'bg-[#f4faff] border-[#e1f0fa]' 
                 : 'bg-white border-dashed border-[#e1f0fa] opacity-60'
             }`}>
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-[#74abcf] font-black uppercase tracking-tighter text-xl">4. Address</h2>
+                <h2 className="text-[#74abcf] font-black uppercase tracking-tighter text-lg md:text-xl">4. Address</h2>
                 {orderMethod === 'drop_off' && (
                   <span className="text-[10px] font-black text-[#74abcf] uppercase bg-[#e1f0fa] px-3 py-1.5 rounded-lg tracking-widest">
                     Not Required
@@ -278,7 +278,7 @@ export default function PlaceOrder() {
                   addresses.map(addr => (
                     <div 
                       key={addr.id} 
-                      className={`bg-white rounded-2xl p-5 relative cursor-pointer transition-all ${
+                      className={`bg-white rounded-2xl p-4 sm:p-5 relative cursor-pointer transition-all ${
                         selectedAddressId === addr.id 
                           ? 'border-4 border-[#74abcf] shadow-md bg-[#f9fcff]' 
                           : 'border-2 border-[#e1f0fa] hover:border-[#abddfc] shadow-sm'
@@ -287,9 +287,9 @@ export default function PlaceOrder() {
                     >
                       <div className="flex items-center gap-2 mb-2">
                         <MapPin size={18} className={selectedAddressId === addr.id ? 'text-[#74abcf]' : 'text-[#97d5fc]'} />
-                        <p className="font-black text-[#74abcf] text-lg uppercase tracking-tight">{addr.name}</p>
+                        <p className="font-black text-[#74abcf] text-base md:text-lg uppercase tracking-tight">{addr.name}</p>
                       </div>
-                      <p className="text-[#5a98bd] font-medium text-sm leading-relaxed pl-6">
+                      <p className="text-[#5a98bd] font-medium text-xs md:text-sm leading-relaxed pl-6">
                         {addr.building_no}, {addr.street} <br/>
                         {addr.city}, {addr.province} <br/>
                         {addr.zip_code || ""}
@@ -297,8 +297,8 @@ export default function PlaceOrder() {
                     </div>
                   ))
                 ) : (
-                  <div className="flex-1 flex items-center justify-center">
-                    <p className="text-[#97d5fc] font-bold text-center">No saved addresses</p>
+                  <div className="flex-1 flex items-center justify-center py-6">
+                    <p className="text-[#97d5fc] font-bold text-center text-sm md:text-base">No saved addresses</p>
                   </div>
                 )}
                 <button 
@@ -313,54 +313,54 @@ export default function PlaceOrder() {
           </div>
 
           {/* SECTION 5: PAYMENT */}
-          <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-6 md:p-8">
-            <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-xl">5. Payment Method</h2>
+          <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-5 md:p-8">
+            <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-lg md:text-xl">5. Payment Method</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button 
                 onClick={() => setPaymentMethod("cod")}
-                className={`bg-white rounded-2xl p-6 flex items-center justify-between transition-all border-4 shadow-sm active:scale-95 ${
+                className={`bg-white rounded-2xl p-5 md:p-6 flex items-center justify-between transition-all border-4 shadow-sm active:scale-95 ${
                   paymentMethod === 'cod' 
                     ? 'border-[#74abcf] text-[#74abcf] shadow-md bg-[#f9fcff]' 
                     : 'border-[#e1f0fa] text-[#97d5fc] hover:border-[#abddfc] hover:text-[#74abcf]'
                 }`}
               >
-                <span className="font-black text-lg uppercase tracking-widest">Cash on Delivery</span>
-                <Banknote size={32} strokeWidth={paymentMethod === 'cod' ? 2.5 : 2}/>
+                <span className="font-black text-sm md:text-lg uppercase tracking-widest">Cash on Delivery</span>
+                <Banknote size={28} strokeWidth={paymentMethod === 'cod' ? 2.5 : 2}/>
               </button>
               
               <button 
                 onClick={() => setPaymentMethod("gcash")}
-                className={`bg-white rounded-2xl p-6 flex items-center justify-between transition-all border-4 shadow-sm active:scale-95 ${
+                className={`bg-white rounded-2xl p-5 md:p-6 flex items-center justify-between transition-all border-4 shadow-sm active:scale-95 ${
                   paymentMethod === 'gcash' 
                     ? 'border-[#74abcf] text-[#74abcf] shadow-md bg-[#f9fcff]' 
                     : 'border-[#e1f0fa] text-[#97d5fc] hover:border-[#abddfc] hover:text-[#74abcf]'
                 }`}
               >
-                <span className="font-black text-lg uppercase tracking-widest">GCash</span>
-                <Smartphone size={32} strokeWidth={paymentMethod === 'gcash' ? 2.5 : 2}/>
+                <span className="font-black text-sm md:text-lg uppercase tracking-widest">GCash</span>
+                <Smartphone size={28} strokeWidth={paymentMethod === 'gcash' ? 2.5 : 2}/>
               </button>
             </div>
 
             {/* Payment method description */}
-            <div className="mt-4 bg-white rounded-2xl p-5 border-2 border-[#e1f0fa] shadow-sm flex items-start gap-3">
+            <div className="mt-4 bg-white rounded-2xl p-4 md:p-5 border-2 border-[#e1f0fa] shadow-sm flex items-start gap-3">
               <div className="text-[#97d5fc] pt-0.5">
                 {paymentMethod === 'cod' ? <Banknote size={20} /> : <Smartphone size={20} />}
               </div>
               <div>
                 {paymentMethod === "cod" && (
-                  <p className="text-[#5a98bd] font-bold text-sm leading-relaxed">
+                  <p className="text-[#5a98bd] font-bold text-xs md:text-sm leading-relaxed">
                     Pay in cash when your laundry is delivered or picked up by our staff.
                   </p>
                 )}
 
                 {paymentMethod === "gcash" && (
-                  <p className="text-[#5a98bd] font-bold text-sm leading-relaxed">
+                  <p className="text-[#5a98bd] font-bold text-xs md:text-sm leading-relaxed">
                     Please wait for staff confirmation before sending your payment via GCash. The QR code will be available in your Orders tab.
                   </p>
                 )}
 
                 {!paymentMethod && (
-                  <p className="text-[#97d5fc] font-bold text-sm">
+                  <p className="text-[#97d5fc] font-bold text-xs md:text-sm">
                     Select a payment method to see instructions.
                   </p>
                 )}
@@ -370,25 +370,38 @@ export default function PlaceOrder() {
         </div>
 
         {/* ================= STICKY SUMMARY BAR ================= */}
-        <div className="absolute bottom-0 left-0 right-0 bg-white border-t-2 border-[#e1f0fa] p-6 md:px-10 flex justify-between items-center shadow-[0_-10px_40px_-15px_rgba(116,171,207,0.15)] rounded-b-[40px]">
-          {orderMethod === "delivery" && (
-            <div className="flex justify-between text-[#5a98bd] font-bold text-sm">
-              <span>Delivery Fee</span>
-              <span>₱ {deliveryFee.toFixed(2)}</span>
-            </div>
-          )}
+        <div className="absolute bottom-0 left-0 right-0 bg-white border-t-2 border-[#e1f0fa] p-5 md:p-6 md:px-10 flex flex-col md:flex-row justify-between items-center gap-4 md:gap-8 shadow-[0_-10px_40px_-15px_rgba(116,171,207,0.15)] rounded-b-[40px] z-20">
           
-          <div className="flex flex-col text-[#74abcf] leading-none">
-            <span className="text-xs font-black uppercase tracking-widest mb-2 text-[#97d5fc]">Total Estimated Cost</span>
-            <span className="text-4xl md:text-5xl font-black tracking-tighter">₱ {calculatedTotal.toFixed(2)}</span>
+          {/* Price Details Container */}
+          <div className="flex flex-col text-center md:text-left w-full md:w-auto">
+            
+            {/* Delivery Tag */}
+            {orderMethod === "delivery" && (
+              <div className="flex items-center justify-center md:justify-start gap-2 text-[#5a98bd] font-bold text-xs mb-1.5 md:mb-2">
+                <span className="bg-[#f4faff] px-2 py-1 rounded-md border border-[#e1f0fa] tracking-wide text-[#74abcf]">
+                  + Delivery Fee: ₱{deliveryFee.toFixed(2)}
+                </span>
+              </div>
+            )}
+
+            <div className="flex flex-col text-[#74abcf] leading-none">
+              <span className="text-[10px] md:text-xs font-black uppercase tracking-widest mb-1 md:mb-2 text-[#97d5fc]">
+                Total Estimated Cost
+              </span>
+              <span className="text-3xl md:text-5xl font-black tracking-tighter">
+                ₱ {calculatedTotal.toFixed(2)}
+              </span>
+            </div>
           </div>
+          
           <button 
             onClick={handleConfirmOrder}
             disabled={loading || (orderMethod === 'delivery' && !selectedAddressId)}
-            className="bg-[#97d5fc] hover:bg-[#74abcf] disabled:bg-[#e1f0ea] disabled:text-[#97d5fc] disabled:active:scale-100 text-white px-8 md:px-12 py-4 rounded-2xl font-black uppercase tracking-widest text-lg transition-all shadow-lg active:scale-95 flex items-center gap-2"
+            className="w-full md:w-auto bg-[#97d5fc] hover:bg-[#74abcf] disabled:bg-[#e1f0fa] disabled:text-[#97d5fc] disabled:active:scale-100 text-white px-8 md:px-12 py-4 rounded-2xl font-black uppercase tracking-widest text-base md:text-lg transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 shrink-0"
           >
             {loading ? "Processing..." : "Confirm Order"}
           </button>
+
         </div>
 
       </div>
