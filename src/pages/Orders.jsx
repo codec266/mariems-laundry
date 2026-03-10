@@ -40,9 +40,10 @@ export default function Orders() {
         date,
         weight_kg,
         total_amount,
+        delivery_fee,
         order_status,
         is_accepted,
-        service_types(service_name),
+        service_types(service_name, price_per_8kg),
         payment_status,
         payments(payment_method),
         addresses(building_no, street, city, province, zip_code, name)
@@ -57,7 +58,6 @@ export default function Orders() {
     
     setLoading(false);
     if (isManualRefresh) {
-      // Small timeout just so the user actually sees the spin animation complete
       setTimeout(() => setIsRefreshing(false), 500); 
     }
   };
@@ -185,58 +185,78 @@ export default function Orders() {
             <p className="text-[#5a98bd] font-bold text-center py-4">No pending orders.</p>
           ) : (
             <div className="flex flex-col gap-4">
-              {pendingOrders.map(order => (
-                <div key={order.id} className="bg-white border-2 border-[#e1f0fa] rounded-2xl p-5 md:p-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 shadow-sm hover:shadow-md transition-shadow">
-                  
-                  <div className="space-y-2 text-[#5a98bd] font-medium text-sm md:text-base w-full">
-                    <p>Order Date: <span className="font-bold text-[#74abcf]">{new Date(order.date).toLocaleDateString()}</span></p>
-                    <p>Service: <span className="font-bold text-[#74abcf]">{order.service_types?.service_name}</span></p>
-                    <p>Laundry Weight: <span className="font-bold text-[#74abcf]">{order.weight_kg} kg</span></p>
-                    {order.addresses && (
-                    <p className="wrap-break-word">Address: <span className="font-bold text-[#74abcf]">
-                      {[
-                        order.addresses.building_no,
-                        order.addresses.street,
-                        order.addresses.city,
-                        order.addresses.province,
-                        order.addresses.zip_code
-                      ].filter(Boolean).join(", ")}
-                    </span></p>
-                  )}
-                    <div className="pt-2 flex flex-wrap items-center gap-2">
-                      <span>Status:</span> {getStatusBadge(order)}
-                    </div>
-                  </div>
+              {pendingOrders.map(order => {
+                // Calculate Breakdown
+                const pricePer8kg = Number(order.service_types?.price_per_8kg || 165);
+                const blocks = Math.ceil(order.weight_kg / 8);
+                const servicePrice = blocks * pricePer8kg;
+                const deliveryFee = Number(order.delivery_fee || 0);
 
-                  <div className="flex flex-col items-end gap-3 w-full lg:w-auto shrink-0">
-                    <div className="border-2 border-[#e1f0fa] text-[#74abcf] rounded-xl px-6 py-3 text-lg font-black bg-[#f4faff] w-full text-center lg:text-right">
-                      Total: ₱{order.total_amount.toFixed(2)}
-                    </div>
+                return (
+                  <div key={order.id} className="bg-white border-2 border-[#e1f0fa] rounded-4xl p-5 md:p-6 flex flex-col lg:flex-row justify-between items-start gap-6 shadow-sm hover:shadow-md transition-shadow">
                     
-                    <div className="flex flex-col sm:flex-row gap-2 w-full lg:justify-end">
-                      {order.order_status === "Pending" && !order.is_accepted && (
-                        <button type="button" onClick={() => handleCancelOrder(order.id)} 
-                          className="w-full sm:w-auto sm:flex-none bg-rose-400 hover:bg-rose-500 text-white px-6 py-2.5 rounded-xl font-bold uppercase text-xs tracking-widest transition-colors shadow-sm active:scale-95">
-                          Cancel
-                        </button>
+                    <div className="space-y-2 text-[#5a98bd] font-medium text-sm md:text-base w-full lg:flex-1">
+                      <p>Order Date: <span className="font-bold text-[#74abcf]">{new Date(order.date).toLocaleDateString()}</span></p>
+                      <p>Service: <span className="font-bold text-[#74abcf]">{order.service_types?.service_name}</span></p>
+                      <p>Laundry Weight: <span className="font-bold text-[#74abcf]">{order.weight_kg} kg</span></p>
+                      {order.addresses && (
+                        <p className="wrap-break-word">Address: <span className="font-bold text-[#74abcf]">
+                          {[
+                            order.addresses.building_no,
+                            order.addresses.street,
+                            order.addresses.city,
+                            order.addresses.province,
+                            order.addresses.zip_code
+                          ].filter(Boolean).join(", ")}
+                        </span></p>
                       )}
-                      {order.order_status === "Pending" &&
-                        order.is_accepted &&
-                        order.payment_status === "Unpaid" &&
-                        order.payments?.some(p => p.payment_method === "GCash") && (
-                          <button
-                            onClick={() => {
-                              setSelectedOrder(order);
-                              setShowPaymentModal(true);
-                            }}
-                            className="w-full sm:w-auto sm:flex-none bg-[#74abcf] hover:bg-[#5a98bd] text-white px-6 py-2.5 rounded-xl font-bold uppercase text-xs tracking-widest transition-colors shadow-sm active:scale-95">
-                            Pay Now
+                      <div className="pt-2 flex flex-wrap items-center gap-2">
+                        <span>Status:</span> {getStatusBadge(order)}
+                      </div>
+                    </div>
+
+                    {/* Breakdown & Controls */}
+                    <div className="flex flex-col gap-4 w-full lg:w-64 shrink-0 mt-2 lg:mt-0">
+                      
+                      {/* Polished Price Tag */}
+                      <div className="bg-[#f4faff] border-2 border-[#e1f0fa] text-[#74abcf] rounded-2xl p-4 text-center shadow-sm w-full">
+                        <p className="text-xs font-black text-[#97d5fc] uppercase tracking-widest mb-2">Total Amount</p>
+                        
+                        <div className="text-xs font-bold text-[#5a98bd] mb-2 flex flex-col gap-1 bg-white p-2 rounded-xl border border-[#e1f0fa]">
+                          <div className="flex justify-between px-1"><span>Service:</span> <span>₱{servicePrice.toFixed(2)}</span></div>
+                          {deliveryFee > 0 && <div className="flex justify-between px-1"><span>Delivery:</span> <span>₱{deliveryFee.toFixed(2)}</span></div>}
+                        </div>
+
+                        <p className="text-3xl font-black tracking-tighter mt-1">
+                          ₱{order.total_amount.toFixed(2)}
+                        </p>
+                      </div>
+                      
+                      <div className="flex flex-col sm:flex-row gap-2 w-full justify-end">
+                        {order.order_status === "Pending" && !order.is_accepted && (
+                          <button type="button" onClick={() => handleCancelOrder(order.id)} 
+                            className="flex-1 bg-white border-2 border-rose-200 hover:bg-rose-50 text-rose-400 px-6 py-2.5 rounded-xl font-bold uppercase text-xs tracking-widest transition-all shadow-sm active:scale-95 flex items-center justify-center">
+                            Cancel Order
                           </button>
                         )}
+                        {order.order_status === "Pending" &&
+                          order.is_accepted &&
+                          order.payment_status === "Unpaid" &&
+                          order.payments?.some(p => p.payment_method === "GCash") && (
+                            <button
+                              onClick={() => {
+                                setSelectedOrder(order);
+                                setShowPaymentModal(true);
+                              }}
+                              className="flex-1 bg-[#74abcf] hover:bg-[#5a98bd] text-white px-6 py-2.5 rounded-xl font-bold uppercase text-xs tracking-widest transition-colors shadow-sm active:scale-95 flex items-center justify-center">
+                              Pay Now
+                            </button>
+                          )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -245,6 +265,16 @@ export default function Orders() {
         <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-5 md:p-8 flex-1">
           <div className="flex justify-between items-end mb-4">
             <h2 className="text-2xl font-black text-[#74abcf] uppercase tracking-tighter">Order History</h2>
+            
+            {/* Reload Button */}
+            <button 
+              onClick={() => fetchOrders(true)} 
+              disabled={isRefreshing || loading}
+              className="flex items-center gap-2 bg-white border-2 border-[#e1f0fa] hover:border-[#abddfc] hover:bg-[#f9fcff] text-[#74abcf] px-3 py-1.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+            >
+              <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
           </div>
           
           <hr className="border-[#e1f0fa] border rounded-full mb-6" />
@@ -308,13 +338,31 @@ export default function Orders() {
                 />
               </div>
 
-              <div className="text-center w-full bg-[#f9fcff] p-4 rounded-2xl border border-[#e1f0fa] mt-2">
-                <p className="font-medium text-[#5a98bd] text-sm flex justify-between">
+              <div className="text-center w-full bg-[#f9fcff] p-5 rounded-2xl border border-[#e1f0fa] mt-2">
+                <p className="font-medium text-[#5a98bd] text-sm flex justify-between mb-3">
                   Order ID: <span className="font-bold text-[#74abcf]">#{selectedOrder.id.toString().slice(0,8)}</span>
                 </p>
-                <hr className="my-2 border-[#e1f0fa]" />
+                
+                <hr className="my-3 border-[#e1f0fa] border-dashed" />
+                
+                {/* Breakdown inside Payment Modal */}
+                <div className="w-full flex flex-col gap-1.5 mb-3 text-sm font-bold text-[#5a98bd]">
+                  <div className="flex justify-between">
+                    <span>Service:</span>
+                    <span>₱{(Math.ceil(selectedOrder.weight_kg / 8) * Number(selectedOrder.service_types?.price_per_8kg || 165)).toFixed(2)}</span>
+                  </div>
+                  {Number(selectedOrder.delivery_fee || 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span>Delivery:</span>
+                      <span>₱{Number(selectedOrder.delivery_fee).toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <hr className="my-3 border-[#e1f0fa]" />
+                
                 <p className="font-black text-[#5a98bd] text-lg flex justify-between items-center">
-                  Total Amount: <span className="text-[#74abcf] text-2xl">₱{selectedOrder.total_amount.toFixed(2)}</span>
+                  Total: <span className="text-[#74abcf] text-3xl">₱{selectedOrder.total_amount.toFixed(2)}</span>
                 </p>
               </div>
 
