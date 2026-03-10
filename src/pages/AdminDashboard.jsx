@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import { User, Home, ShoppingCart, LogOut, Check, X, TrendingUp, Clock, Package, BarChart3 } from "lucide-react";
+import { User, Home, ShoppingCart, LogOut, Check, X, TrendingUp, Clock, Package, BarChart3, RefreshCw } from "lucide-react";
 import logo from "../assets/logo.png";
 
 export default function AdminDashboard() {
@@ -15,9 +15,11 @@ export default function AdminDashboard() {
   const [totalRevenue, setTotalRevenue] = useState(0);
 
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false); // Added refresh state
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const fetchDashboardData = async (isManualRefresh = false) => {
+    if (isManualRefresh) setIsRefreshing(true);
+    else setLoading(true);
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -64,6 +66,9 @@ export default function AdminDashboard() {
     }
 
     setLoading(false);
+    if (isManualRefresh) {
+      setTimeout(() => setIsRefreshing(false), 500); // Small delay to show spin animation
+    }
   };
 
   useEffect(() => {
@@ -149,7 +154,7 @@ export default function AdminDashboard() {
         {/* QUICK STATS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-4xl p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-[32px] p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
             <div className="absolute -right-4 -top-4 text-[#e1f0fa] group-hover:text-[#abddfc] transition-colors opacity-50">
               <Clock size={120} strokeWidth={1} />
             </div>
@@ -159,17 +164,17 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-4xl p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-[32px] p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
              <div className="absolute -right-4 -top-4 text-[#e1f0fa] group-hover:text-[#abddfc] transition-colors opacity-50">
               <Package size={120} strokeWidth={1} />
             </div>
             <div className="relative z-10">
-              <h3 className="text-[#97d5fc] font-black uppercase tracking-widest text-xs mb-2">Ongoing Orders</h3>
+              <h3 className="text-[#97d5fc] font-black uppercase tracking-widest text-xs mb-2">Active Orders</h3>
               <p className="text-5xl font-black text-[#74abcf]">{ongoingCount}</p>
             </div>
           </div>
 
-          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-4xl p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-[32px] p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
              <div className="absolute -right-4 -top-4 text-[#e1f0fa] group-hover:text-[#abddfc] transition-colors opacity-50">
               <TrendingUp size={120} strokeWidth={1} />
             </div>
@@ -182,16 +187,28 @@ export default function AdminDashboard() {
         </div>
 
         {/* PENDING ORDERS */}
-        <div className="bg-white border-2 border-[#e1f0fa] rounded-4xl p-6 md:p-8 flex-1 flex flex-col">
+        <div className="bg-white border-2 border-[#e1f0fa] rounded-[32px] p-6 md:p-8 flex-1 flex flex-col">
 
-          <h2 className="text-2xl font-black text-[#74abcf] uppercase tracking-tighter mb-4 flex items-center gap-3">
-            <span className="bg-[#f4faff] p-2 rounded-xl text-[#97d5fc]"><Clock size={24} strokeWidth={3} /></span>
-            Action Required: Pending Orders
-          </h2>
+          {/* Header & Refresh Button */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
+            <h2 className="text-2xl font-black text-[#74abcf] uppercase tracking-tighter flex items-center gap-3">
+              <span className="bg-[#f4faff] p-2 rounded-xl text-[#97d5fc]"><Clock size={24} strokeWidth={3} /></span>
+              Action Required
+            </h2>
+            
+            <button 
+              onClick={() => fetchDashboardData(true)} 
+              disabled={isRefreshing || loading}
+              className="flex items-center justify-center gap-2 bg-[#f4faff] border-2 border-[#e1f0fa] hover:border-[#abddfc] text-[#74abcf] px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+            >
+              <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} strokeWidth={2.5} />
+              <span>Refresh</span>
+            </button>
+          </div>
 
           <hr className="border-[#e1f0fa] mb-6" />
 
-          {loading ? (
+          {loading && !isRefreshing ? (
             <div className="flex-1 flex justify-center items-center">
               <p className="text-[#97d5fc] font-bold text-lg animate-pulse">Loading pending orders...</p>
             </div>

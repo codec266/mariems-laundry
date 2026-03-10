@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import { User, Home, ShoppingCart, LogOut, X } from "lucide-react";
+import { User, Home, ShoppingCart, LogOut, X, RefreshCw } from "lucide-react";
 import logo from "../assets/logo.png";
 import gcash from "../assets/gcash.jpg";
 
@@ -11,13 +11,16 @@ export default function Orders() {
   const [pendingOrders, setPendingOrders] = useState([]);
   const [orderHistory, setOrderHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false); // State for the refresh animation
 
   // payment
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
-  const fetchOrders = async () => {
-    setLoading(true);
+  const fetchOrders = async (isManualRefresh = false) => {
+    if (isManualRefresh) setIsRefreshing(true);
+    else setLoading(true);
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/"); return; }
 
@@ -51,7 +54,12 @@ export default function Orders() {
       setPendingOrders(ordersData.filter(o => !["Claimed", "Cancelled", "Completed"].includes(o.order_status)));
       setOrderHistory(ordersData.filter(o => ["Claimed", "Cancelled", "Completed"].includes(o.order_status)));
     }
+    
     setLoading(false);
+    if (isManualRefresh) {
+      // Small timeout just so the user actually sees the spin animation complete
+      setTimeout(() => setIsRefreshing(false), 500); 
+    }
   };
 
   useEffect(() => {
@@ -155,10 +163,23 @@ export default function Orders() {
 
         {/* Active Orders */}
         <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-5 md:p-8">
-          <h2 className="text-2xl font-black text-[#74abcf] uppercase tracking-tighter mb-4">Active Orders</h2>
+          <div className="flex justify-between items-end mb-4">
+            <h2 className="text-2xl font-black text-[#74abcf] uppercase tracking-tighter">Active Orders</h2>
+            
+            {/* Reload Button */}
+            <button 
+              onClick={() => fetchOrders(true)} 
+              disabled={isRefreshing || loading}
+              className="flex items-center gap-2 bg-white border-2 border-[#e1f0fa] hover:border-[#abddfc] hover:bg-[#f9fcff] text-[#74abcf] px-3 py-1.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+            >
+              <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+          </div>
+
           <hr className="border-[#e1f0fa] border rounded-full mb-6" />
 
-          {loading ? (
+          {loading && !isRefreshing ? (
             <p className="text-[#97d5fc] font-bold animate-pulse text-center py-4">Loading active orders...</p>
           ) : pendingOrders.length === 0 ? (
             <p className="text-[#5a98bd] font-bold text-center py-4">No pending orders.</p>
@@ -222,11 +243,24 @@ export default function Orders() {
 
         {/* Order History */}
         <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-5 md:p-8 flex-1">
-          <h2 className="text-2xl font-black text-[#74abcf] uppercase tracking-tighter mb-4">Order History</h2>
+          <div className="flex justify-between items-end mb-4">
+            <h2 className="text-2xl font-black text-[#74abcf] uppercase tracking-tighter">Order History</h2>
+            
+            {/* Reload Button */}
+            <button 
+              onClick={() => fetchOrders(true)} 
+              disabled={isRefreshing || loading}
+              className="flex items-center gap-2 bg-white border-2 border-[#e1f0fa] hover:border-[#abddfc] hover:bg-[#f9fcff] text-[#74abcf] px-3 py-1.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+            >
+              <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+          </div>
+          
           <hr className="border-[#e1f0fa] border rounded-full mb-6" />
 
           <div className="w-full overflow-x-auto rounded-2xl border border-[#e1f0fa] shadow-sm bg-white">
-            <table className="w-full min-w-125 text-left text-[#5a98bd] text-sm">
+            <table className="w-full min-w-[500px] text-left text-[#5a98bd] text-sm">
               <thead className="bg-[#e1f0fa]/50 text-[#74abcf] uppercase font-black tracking-wider text-xs border-b border-[#e1f0fa]">
                 <tr>
                   <th className="py-4 px-4 md:px-6">Date</th>
@@ -237,7 +271,7 @@ export default function Orders() {
                 </tr>
               </thead>
               <tbody className="font-medium">
-                {loading ? (
+                {loading && !isRefreshing ? (
                   <tr><td colSpan={5} className="py-8 text-center text-[#97d5fc] font-bold animate-pulse">Loading past orders...</td></tr>
                 ) : orderHistory.length === 0 ? (
                   <tr><td colSpan={5} className="py-8 text-center text-[#5a98bd] font-bold">No past orders.</td></tr>
@@ -262,7 +296,7 @@ export default function Orders() {
         {/* Payment Modal */}
         {showPaymentModal && selectedOrder && (
           <div className="fixed inset-0 bg-[#5a98bd]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-4xl shadow-2xl p-6 md:p-8 max-w-md w-full relative flex flex-col items-center gap-4 border-2 border-[#e1f0fa] animate-in fade-in zoom-in duration-200">
+            <div className="bg-white rounded-[32px] shadow-2xl p-6 md:p-8 max-w-md w-full relative flex flex-col items-center gap-4 border-2 border-[#e1f0fa] animate-in fade-in zoom-in duration-200">
               
               <button
                 className="absolute top-4 right-4 md:top-6 md:right-6 text-[#97d5fc] hover:text-[#74abcf] transition-colors bg-[#f4faff] p-2 rounded-full"
