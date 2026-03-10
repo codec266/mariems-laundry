@@ -35,7 +35,8 @@ export default function PlaceOrder() {
   // Derived
   const activeService = services.find(s => s.id === selectedService) || { price_per_8kg: 0 };
   const blocks = Math.ceil(weight / 8);
-  const calculatedTotal = blocks * Number(activeService.price_per_8kg);
+  const deliveryFee = orderMethod === "delivery" ? 40 : 0; // Updated to 40 pesos
+  const calculatedTotal = blocks * Number(activeService.price_per_8kg) + deliveryFee;
 
   // fetch user info and addresses
   useEffect(() => {
@@ -98,6 +99,7 @@ export default function PlaceOrder() {
         service_type_id: selectedService,
         weight_kg: weight,
         total_amount: calculatedTotal,
+        delivery_fee: deliveryFee,        // ✅ Add delivery_fee
         order_status: "Pending",
         payment_status: "Unpaid",
         date: new Date().toISOString(),
@@ -369,6 +371,13 @@ export default function PlaceOrder() {
 
         {/* ================= STICKY SUMMARY BAR ================= */}
         <div className="absolute bottom-0 left-0 right-0 bg-white border-t-2 border-[#e1f0fa] p-6 md:px-10 flex justify-between items-center shadow-[0_-10px_40px_-15px_rgba(116,171,207,0.15)] rounded-b-[40px]">
+          {orderMethod === "delivery" && (
+            <div className="flex justify-between text-[#5a98bd] font-bold text-sm">
+              <span>Delivery Fee</span>
+              <span>₱ {deliveryFee.toFixed(2)}</span>
+            </div>
+          )}
+          
           <div className="flex flex-col text-[#74abcf] leading-none">
             <span className="text-xs font-black uppercase tracking-widest mb-2 text-[#97d5fc]">Total Estimated Cost</span>
             <span className="text-4xl md:text-5xl font-black tracking-tighter">₱ {calculatedTotal.toFixed(2)}</span>
@@ -376,7 +385,7 @@ export default function PlaceOrder() {
           <button 
             onClick={handleConfirmOrder}
             disabled={loading || (orderMethod === 'delivery' && !selectedAddressId)}
-            className="bg-[#97d5fc] hover:bg-[#74abcf] disabled:bg-[#e1f0fa] disabled:text-[#97d5fc] disabled:active:scale-100 text-white px-8 md:px-12 py-4 rounded-2xl font-black uppercase tracking-widest text-lg transition-all shadow-lg active:scale-95 flex items-center gap-2"
+            className="bg-[#97d5fc] hover:bg-[#74abcf] disabled:bg-[#e1f0ea] disabled:text-[#97d5fc] disabled:active:scale-100 text-white px-8 md:px-12 py-4 rounded-2xl font-black uppercase tracking-widest text-lg transition-all shadow-lg active:scale-95 flex items-center gap-2"
           >
             {loading ? "Processing..." : "Confirm Order"}
           </button>
