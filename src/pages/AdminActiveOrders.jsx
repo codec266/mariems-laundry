@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import { User, Home, ShoppingCart, LogOut, Check, X, Edit2, ChevronDown, BarChart3 } from "lucide-react";
+import { User, Home, ShoppingCart, LogOut, Check, X, Edit2, ChevronDown, BarChart3, RefreshCw } from "lucide-react";
 import logo from "../assets/logo.png";
 
 export default function AdminActiveOrders() {
@@ -10,14 +10,16 @@ export default function AdminActiveOrders() {
   const [firstName, setFirstName] = useState("");
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false); // Added refresh state
 
   // For inline editing
   const [editingOrderId, setEditingOrderId] = useState(null);
   const [editedWeight, setEditedWeight] = useState(0);
 
   // Fetch orders and admin info
-  const fetchOrders = async () => {
-    setLoading(true);
+  const fetchOrders = async (isManualRefresh = false) => {
+    if (isManualRefresh) setIsRefreshing(true);
+    else setLoading(true);
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -42,6 +44,7 @@ export default function AdminActiveOrders() {
         date,
         weight_kg,
         total_amount,
+        delivery_fee,
         order_status,
         is_accepted,
         order_method,
@@ -54,7 +57,12 @@ export default function AdminActiveOrders() {
       .order("date", { ascending: false });
 
     if (!error && ordersData) setOrders(ordersData);
+    
     setLoading(false);
+    if (isManualRefresh) {
+      // Small timeout so the spin animation has time to be seen
+      setTimeout(() => setIsRefreshing(false), 500); 
+    }
   };
 
   useEffect(() => {
@@ -72,7 +80,9 @@ export default function AdminActiveOrders() {
     const weight = Number(editedWeight);
     const pricePer8kg = Number(order.service_types?.price_per_8kg || 165);
     const blocks = Math.ceil(weight / 8);
-    const newTotal = blocks * pricePer8kg;
+    const servicePrice = blocks * pricePer8kg;
+    const deliveryFee = Number(order.delivery_fee || 0);
+    const newTotal = servicePrice + deliveryFee;
 
     const { error } = await supabase
       .from("orders")
@@ -114,7 +124,7 @@ export default function AdminActiveOrders() {
 
   const getStatusBadge = (order) => {
     const displayStatus = getDisplayStatus(order);
-    let colorClass = "bg-[#f4faff] text-[#74abcf]"; // default
+    let colorClass = "bg-gray-100 text-gray-700"; // default
 
     if (order.order_status === "Pending" && !order.is_accepted) colorClass = "bg-orange-100 text-orange-700";
     else if (order.order_status === "Pending" && order.is_accepted) colorClass = "bg-blue-100 text-blue-700";
@@ -169,18 +179,30 @@ export default function AdminActiveOrders() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 bg-white rounded-[40px] shadow-2xl p-5 md:p-10 flex flex-col gap-8">
-        <h1 className="text-4xl md:text-5xl font-black text-[#74abcf] uppercase tracking-tighter">
-          Active Orders
-        </h1>
+      <div className="flex-1 bg-white rounded-[40px] shadow-2xl p-5 md:p-10 flex flex-col gap-8 overflow-hidden">
+        
+        {/* Header with Refresh Button */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-2">
+          <h1 className="text-4xl md:text-5xl font-black text-[#74abcf] uppercase tracking-tighter">
+            Active Orders
+          </h1>
+          <button 
+            onClick={() => fetchOrders(true)} 
+            disabled={isRefreshing || loading}
+            className="flex items-center justify-center gap-2 bg-[#f4faff] border-2 border-[#e1f0fa] hover:border-[#abddfc] text-[#74abcf] px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+          >
+            <RefreshCw size={18} className={isRefreshing ? "animate-spin" : ""} strokeWidth={3} />
+            <span>Refresh</span>
+          </button>
+        </div>
 
-        {loading ? (
+        {loading && !isRefreshing ? (
           <div className="flex-1 flex justify-center items-center">
             <p className="text-[#97d5fc] font-bold text-lg animate-pulse">Loading active orders...</p>
           </div>
         ) : orders.length === 0 ? (
-          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-3xl p-10 flex justify-center items-center">
-            <p className="text-[#5a98bd] font-bold text-lg text-center">No active orders found.</p>
+          <div className="bg-[#f4faff] border-2 border-dashed border-[#e1f0fa] rounded-3xl p-10 flex justify-center items-center">
+            <p className="text-[#5a98bd] font-bold text-lg text-center">All caught up! No active orders.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-6">
@@ -189,18 +211,19 @@ export default function AdminActiveOrders() {
               const pricePer8kg = Number(order.service_types?.price_per_8kg || 165);
               const displayedWeight = isEditing ? Number(editedWeight) : order.weight_kg;
               const blocks = Math.ceil(displayedWeight / 8);
-              const totalPrice = blocks * pricePer8kg;
+              const servicePrice = blocks * pricePer8kg;
+              const deliveryFee = Number(order.delivery_fee || 0);
+              const totalPrice = servicePrice + deliveryFee;
 
               return (
                 <div
                   key={order.id}
-                  className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-4xl p-5 sm:p-6 md:p-8 flex flex-col lg:flex-row justify-between gap-6 md:gap-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
+                  className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-[32px] p-5 sm:p-6 md:p-8 flex flex-col lg:flex-row justify-between gap-6 md:gap-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
                 >
                   {/* Left Side: Information */}
                   <div className="flex-1 flex flex-col justify-between gap-4 relative z-10 w-full">
                     
                     <div className="space-y-1 text-[#5a98bd] font-medium">
-                      {/* Status Badges - Made responsive to wrap on small screens */}
                       <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
                         <span className="bg-white text-[#74abcf] font-black px-3 sm:px-4 py-1.5 rounded-full border border-[#e1f0fa] shadow-sm text-xs sm:text-sm uppercase tracking-widest shrink-0">
                           #{order.id.toString().slice(0, 8)}
@@ -233,7 +256,6 @@ export default function AdminActiveOrders() {
                       )}
                     </div>
 
-                    {/* Weight Input Area */}
                     <div className="mt-4 flex flex-wrap items-center gap-3 bg-white p-3 rounded-2xl border border-[#e1f0fa] shadow-sm self-start w-full sm:w-auto">
                       <span className="text-sm font-bold text-[#97d5fc] uppercase tracking-widest ml-2">Weight:</span>
                       {isEditing ? (
@@ -256,10 +278,18 @@ export default function AdminActiveOrders() {
                   {/* Right Side: Total & Controls */}
                   <div className="flex flex-col gap-4 w-full lg:w-64 relative z-10 shrink-0">
                     
-                    {/* Big Price Tag */}
+                    {/* Polished Price Tag */}
                     <div className="bg-white border-2 border-[#e1f0fa] text-[#74abcf] rounded-2xl p-4 text-center shadow-sm w-full">
-                      <p className="text-xs font-black text-[#97d5fc] uppercase tracking-widest mb-1">Total Amount</p>
-                      <p className="text-3xl font-black tracking-tighter">₱{totalPrice.toFixed(2)}</p>
+                      <p className="text-xs font-black text-[#97d5fc] uppercase tracking-widest mb-2">Total Amount</p>
+                      
+                      <div className="text-xs font-bold text-[#5a98bd] mb-2 flex flex-col gap-1 bg-[#f4faff] p-2 rounded-xl border border-[#e1f0fa]">
+                        <div className="flex justify-between px-1"><span>Service:</span> <span>₱{servicePrice.toFixed(2)}</span></div>
+                        {deliveryFee > 0 && <div className="flex justify-between px-1"><span>Delivery:</span> <span>₱{deliveryFee.toFixed(2)}</span></div>}
+                      </div>
+
+                      <p className="text-3xl font-black tracking-tighter mt-1">
+                        ₱{totalPrice.toFixed(2)}
+                      </p>
                     </div>
 
                     {/* Action Controls */}
