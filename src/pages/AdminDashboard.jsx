@@ -15,7 +15,7 @@ export default function AdminDashboard() {
   const [totalRevenue, setTotalRevenue] = useState(0);
 
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false); // Added refresh state
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchDashboardData = async (isManualRefresh = false) => {
     if (isManualRefresh) setIsRefreshing(true);
@@ -36,7 +36,7 @@ export default function AdminDashboard() {
 
     if (adminData) setFirstName(adminData.first_name);
 
-    // fetch orders
+    // fetch orders (Added delivery_fee and price_per_8kg for the breakdown)
     const { data: ordersData, error } = await supabase
       .from("orders")
       .select(`
@@ -44,10 +44,11 @@ export default function AdminDashboard() {
         date,
         weight_kg,
         total_amount,
+        delivery_fee,
         order_status,
         is_accepted,
         customers(first_name, last_name),
-        service_types(service_name),
+        service_types(service_name, price_per_8kg),
         addresses(building_no, street, city, province, zip_code)
       `)
       .order("date", { ascending: false });
@@ -92,6 +93,8 @@ export default function AdminDashboard() {
   };
 
   const handleDeny = async (orderId) => {
+    if(!window.confirm("Are you sure you want to deny and cancel this order?")) return;
+    
     const { error } = await supabase
       .from("orders")
       .update({ order_status: "Cancelled" })
@@ -145,7 +148,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 bg-white rounded-[40px] shadow-2xl p-8 md:p-10 flex flex-col gap-8">
+      <div className="flex-1 bg-white rounded-[40px] shadow-2xl p-5 md:p-10 flex flex-col gap-8 overflow-hidden">
 
         <h1 className="text-4xl md:text-5xl font-black text-[#74abcf] uppercase tracking-tighter">
           Dashboard Overview
@@ -154,7 +157,7 @@ export default function AdminDashboard() {
         {/* QUICK STATS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-4xl p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-4xl p-6 md:p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
             <div className="absolute -right-4 -top-4 text-[#e1f0fa] group-hover:text-[#abddfc] transition-colors opacity-50">
               <Clock size={120} strokeWidth={1} />
             </div>
@@ -164,7 +167,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-4xl p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-4xl p-6 md:p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
              <div className="absolute -right-4 -top-4 text-[#e1f0fa] group-hover:text-[#abddfc] transition-colors opacity-50">
               <Package size={120} strokeWidth={1} />
             </div>
@@ -174,7 +177,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-4xl p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-4xl p-6 md:p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
              <div className="absolute -right-4 -top-4 text-[#e1f0fa] group-hover:text-[#abddfc] transition-colors opacity-50">
               <TrendingUp size={120} strokeWidth={1} />
             </div>
@@ -187,7 +190,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* PENDING ORDERS */}
-        <div className="bg-white border-2 border-[#e1f0fa] rounded-4xl p-6 md:p-8 flex-1 flex flex-col">
+        <div className="bg-white border-2 border-[#e1f0fa] rounded-4xl p-5 md:p-8 flex-1 flex flex-col">
 
           {/* Header & Refresh Button */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
@@ -217,67 +220,96 @@ export default function AdminDashboard() {
               <p className="text-[#5a98bd] font-bold text-lg text-center">You're all caught up!<br/><span className="text-[#97d5fc] text-sm">No pending orders require your attention.</span></p>
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
-              {pendingOrders.map(order => (
-                <div key={order.id} className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex flex-col gap-6">
+              {pendingOrders.map(order => {
+                // Calculate Breakdown
+                const pricePer8kg = Number(order.service_types?.price_per_8kg || 165);
+                const blocks = Math.ceil(order.weight_kg / 8);
+                const servicePrice = blocks * pricePer8kg;
+                const deliveryFee = Number(order.delivery_fee || 0);
+                const totalPrice = servicePrice + deliveryFee;
 
-                  <div className="space-y-1 text-[#5a98bd] font-medium text-sm">
-                    <div className="mb-2">
-                       <span className="bg-white text-[#74abcf] font-black px-3 py-1 rounded-full border border-[#e1f0fa] text-xs uppercase tracking-widest">
-                          #{order.id.toString().slice(0, 8)}
-                        </span>
+                return (
+                  <div key={order.id} className="bg-[#f4faff] border-2 border-[#e1f0fa] rounded-4xl p-5 sm:p-6 md:p-8 flex flex-col lg:flex-row justify-between items-start gap-6 md:gap-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+
+                    {/* Left: Info */}
+                    <div className="space-y-2 text-[#5a98bd] font-medium text-sm w-full lg:flex-1">
+                      <div className="mb-4">
+                         <span className="bg-white text-[#74abcf] font-black px-4 py-1.5 rounded-full border border-[#e1f0fa] text-xs uppercase tracking-widest shadow-sm">
+                            #{order.id.toString().slice(0, 8)}
+                          </span>
+                      </div>
+
+                      <p className="text-sm">
+                        Customer: <span className="font-bold text-[#74abcf] text-base">{order.customers?.first_name} {order.customers?.last_name}</span>
+                      </p>
+
+                      <p className="text-sm">
+                        Service: <span className="font-bold text-[#74abcf] text-base">{order.service_types?.service_name}</span>
+                      </p>
+
+                      <p className="text-sm flex gap-4">
+                        <span>Weight: <span className="font-bold text-[#74abcf] text-base">{order.weight_kg} kg</span></span>
+                      </p>
+                      
+                      <p className="text-sm flex gap-4">
+                         <span>Date: <span className="font-bold text-[#74abcf] text-base">{new Date(order.date).toLocaleDateString()}</span></span>
+                      </p>
+
+                      {order.addresses && (
+                        <p className="pt-2 text-sm wrap-break-word">
+                          Address: <span className="font-bold text-[#74abcf] text-base">
+                            {[
+                              order.addresses.building_no,
+                              order.addresses.street,
+                              order.addresses.city,
+                              order.addresses.province,
+                              order.addresses.zip_code
+                            ].filter(Boolean).join(", ")}
+                          </span>
+                        </p>
+                      )}
                     </div>
 
-                    <p>
-                      Customer: <span className="font-bold text-[#74abcf] text-base">{order.customers?.first_name} {order.customers?.last_name}</span>
-                    </p>
+                    {/* Right Side: Total Breakdown & Controls */}
+                    <div className="flex flex-col gap-4 w-full lg:w-64 shrink-0 mt-2 lg:mt-0">
+                    
+                      {/* Polished Price Tag */}
+                      <div className="bg-white border-2 border-[#e1f0fa] text-[#74abcf] rounded-2xl p-4 text-center shadow-sm w-full">
+                        <p className="text-xs font-black text-[#97d5fc] uppercase tracking-widest mb-2">Estimated Amount</p>
+                        
+                        <div className="text-xs font-bold text-[#5a98bd] mb-2 flex flex-col gap-1 bg-[#f4faff] p-2 rounded-xl border border-[#e1f0fa]">
+                          <div className="flex justify-between px-1"><span>Service:</span> <span>₱{servicePrice.toFixed(2)}</span></div>
+                          {deliveryFee > 0 && <div className="flex justify-between px-1"><span>Delivery:</span> <span>₱{deliveryFee.toFixed(2)}</span></div>}
+                        </div>
 
-                    <p>
-                      Service: <span className="font-bold text-[#74abcf] text-base">{order.service_types?.service_name}</span>
-                    </p>
+                        <p className="text-3xl font-black tracking-tighter mt-1">
+                          ₱{totalPrice.toFixed(2)}
+                        </p>
+                      </div>
 
-                    <p className="flex gap-4">
-                      <span>Weight: <span className="font-bold text-[#74abcf] text-base">{order.weight_kg} kg</span></span>
-                      <span>Date: <span className="font-bold text-[#74abcf] text-base">{new Date(order.dropoff_date || order.date).toLocaleDateString()}</span></span>
-                    </p>
+                      {/* Action Buttons */}
+                      <div className="flex flex-col sm:flex-row gap-3 w-full justify-end">
+                        <button
+                          onClick={() => handleAccept(order.id)}
+                          className="flex-1 bg-emerald-400 hover:bg-emerald-500 text-white px-4 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2"
+                        >
+                          <Check size={16} strokeWidth={3} /> Accept
+                        </button>
 
-                    {order.addresses && (
-                      <p className="pt-2">
-                        Address: <span className="font-bold text-[#74abcf]">
-                          {[
-                            order.addresses.building_no,
-                            order.addresses.street,
-                            order.addresses.city,
-                            order.addresses.province,
-                            order.addresses.zip_code
-                          ].filter(Boolean).join(", ")}
-                        </span>
-                      </p>
-                    )}
+                        <button
+                          onClick={() => handleDeny(order.id)}
+                          className="flex-1 bg-white border-2 border-rose-200 hover:bg-rose-50 text-rose-400 px-4 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2"
+                        >
+                          <X size={16} strokeWidth={3} /> Deny
+                        </button>
+                      </div>
+                      
+                    </div>
+
                   </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto mt-4 md:mt-0">
-                    <button
-                      onClick={() => handleAccept(order.id)}
-                      className="flex-1 sm:flex-none bg-emerald-400 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2"
-                    >
-                      <Check size={18} strokeWidth={3} /> Accept
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        if(window.confirm("Are you sure you want to deny and cancel this order?")) {
-                          handleDeny(order.id);
-                        }
-                      }}
-                      className="flex-1 sm:flex-none bg-white border-2 border-rose-200 hover:bg-rose-50 text-rose-400 px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2"
-                    >
-                      <X size={18} strokeWidth={3} /> Deny
-                    </button>
-                  </div>
-
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
