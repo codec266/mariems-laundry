@@ -1,0 +1,388 @@
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { 
+  User, Home, ShoppingCart, LogOut, ArrowLeft, 
+  Shirt, Sparkles, Truck, Store, Plus, Minus, MapPin, Banknote, Smartphone 
+} from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
+import logo from "../assets/logo.png";
+
+const orderMethods = [
+  { id: "delivery", name: "PICK-UP & DELIVERY", icon: Truck },
+  { id: "drop_off", name: "SELF DROP-OFF", icon: Store },
+];
+
+const serviceIcons = {
+  wash_fold: Shirt,
+  dry_clean: Sparkles,
+};
+
+export default function PlaceOrder() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // UI States
+  const [userName, setUserName] = useState("Your Name");
+  const [selectedService, setSelectedService] = useState("wash_fold");
+  const [orderMethod, setOrderMethod] = useState("delivery");
+  const [paymentMethod, setPaymentMethod] = useState("cod"); // 'cod' or 'gcash'
+  const [weight, setWeight] = useState(8); // default 8kg
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [services, setServices] = useState([]); 
+
+  // Derived
+  const activeService = services.find(s => s.id === selectedService) || { price_per_8kg: 0 };
+  const blocks = Math.ceil(weight / 8);
+  const calculatedTotal = blocks * Number(activeService.price_per_8kg);
+
+  // fetch user info and addresses
+  useEffect(() => {
+    const fetchServices = async () => {
+      const { data, error } = await supabase.from("service_types").select("*");
+      if (data) setServices(data);
+      if (error) console.error("Service fetch error:", error.message);
+    };
+
+    const fetchData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/");
+        return;
+      }
+
+      // get customer name
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("first_name")
+        .eq("id", user.id)
+        .single();
+      if (customer) setUserName(customer.first_name);
+
+      // get addresses
+      const { data: addressData } = await supabase
+        .from("addresses")
+        .select("*")
+        .eq("customer_id", user.id)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
+
+      if (addressData) {
+        setAddresses(addressData);
+        if (addressData.length > 0) setSelectedAddressId(addressData[0].id);
+      }
+    };
+    fetchServices();
+    fetchData();
+  }, [navigate]);
+
+  // Place order
+  const handleConfirmOrder = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    setLoading(true);
+
+    const service = services.find(s => s.id === selectedService);
+    if (!service) {
+      setLoading(false);
+      alert("Please input a valid service.");
+      return;
+    }
+
+    const { data: newOrder, error: orderError } = await supabase
+      .from("orders").insert([{
+        customer_id: user.id,
+        address_id: orderMethod === "delivery" ? selectedAddressId : null,
+        service_type_id: selectedService,
+        weight_kg: weight,
+        total_amount: calculatedTotal,
+        order_status: "Pending",
+        payment_status: "Unpaid",
+        date: new Date().toISOString(),
+        order_method: orderMethod === "delivery" ? "Delivery" : "Walk-in",
+      }])
+      .select()
+      .single();
+
+    if (orderError) {
+      setLoading(false);
+      console.error("Order error:", orderError.message);
+      alert("Failed to place order. See console.");
+      return;
+    }
+
+    const { error: paymentError } = await supabase.from("payments").insert([{
+      order_id: newOrder.id,
+      amount_paid: calculatedTotal,
+      payment_method: paymentMethod === "cod" ? "Cash" : "GCash"
+    }]);
+
+    setLoading(false);
+
+    if (paymentError) {
+      console.error("Payment error:", paymentError.message);
+      alert("Order placed, but payment record failed. Check console.");
+      return;
+    }
+    alert("Order placed successfully!");
+    navigate("/orders");
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/");
+  };
+
+  return (
+    <div className="min-h-screen bg-[#abddfc] p-4 md:p-8 flex flex-col md:flex-row gap-6 font-sans">
+
+      {/* Left Sidebar */}
+      <div className="w-full md:w-64 shrink-0 flex flex-col">
+        <div className="flex justify-center md:justify-start mb-6 px-4">
+          <img src={logo} alt="Mariem's Laundry Logo" className="w-48 h-auto object-contain drop-shadow-sm" />
+        </div>
+        <div className="bg-white rounded-2xl p-4 flex items-center gap-4 text-[#74abcf] font-black text-lg shadow-sm mb-4">
+          <div className="bg-[#97d5fc] rounded-full p-2 text-white">
+            <User size={24} strokeWidth={2.5} />
+          </div>
+          <span>{userName}</span>
+        </div>
+        <div className="bg-white rounded-3xl p-6 flex flex-col gap-6 text-[#74abcf] font-black text-xl shadow-sm">
+          <button onClick={() => navigate("/home")} className="flex items-center gap-4 hover:text-[#97d5fc] transition-colors">
+            <Home size={28} strokeWidth={2.5} /> Home
+          </button>
+          <button onClick={() => navigate("/orders")} className="flex items-center gap-4 text-[#97d5fc] transition-colors">
+            <ShoppingCart size={28} strokeWidth={2.5} /> Orders
+          </button>
+          <hr className="border-blue-50" />
+          <button onClick={handleLogout} className="flex items-center gap-4 hover:text-[#97d5fc] transition-colors mt-2">
+            <LogOut size={28} strokeWidth={2.5} /> Logout
+          </button>
+        </div>
+      </div>
+
+      {/* ================= MAIN CONTENT ================= */}
+      <div className="flex-1 bg-white rounded-[40px] shadow-2xl p-8 md:p-10 flex flex-col relative overflow-hidden">
+        
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-8">
+          <button onClick={() => navigate("/orders")} className="text-[#97d5fc] hover:text-[#74abcf] hover:-translate-x-1 transition-all">
+            <ArrowLeft size={36} strokeWidth={3}/>
+          </button>
+          <h1 className="text-4xl md:text-5xl font-black text-[#74abcf] uppercase tracking-tighter">
+            Place Order
+          </h1>
+        </div>
+
+        {/* Scrollable Content Area */}
+        <div className="flex-1 space-y-8 pb-32"> 
+
+          {/* SECTION 1 & 2 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            {/* Service Type */}
+            <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-6 md:p-8">
+              <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-xl">1. Service Type</h2>
+              <div className="grid grid-cols-2 gap-4">
+                {services.map(service => {
+                  const Icon = serviceIcons[service.id] || Shirt;
+                  const isActive = selectedService === service.id;
+
+                  return (
+                    <button
+                      key={service.id}
+                      onClick={() => setSelectedService(service.id)}
+                      className={`bg-white rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-3 transition-all border-4 shadow-sm active:scale-95 ${
+                        isActive 
+                          ? 'border-[#74abcf] text-[#74abcf] shadow-md bg-[#f9fcff]' 
+                          : 'border-[#e1f0fa] text-[#97d5fc] hover:border-[#abddfc] hover:text-[#74abcf]'
+                      }`}
+                    >
+                      <Icon size={40} strokeWidth={isActive ? 2.5 : 2} />
+                      <span className="font-black text-sm uppercase tracking-tight leading-tight">
+                        {service.service_name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Order Method */}
+            <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-6 md:p-8">
+              <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-xl">2. Order Method</h2>
+              <div className="grid grid-cols-2 gap-4">
+                {orderMethods.map(method => {
+                  const Icon = method.icon;
+                  const isActive = orderMethod === method.id;
+                  return (
+                    <button 
+                      key={method.id} onClick={() => setOrderMethod(method.id)}
+                      className={`bg-white rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-3 transition-all border-4 shadow-sm active:scale-95 ${
+                        isActive 
+                          ? 'border-[#74abcf] text-[#74abcf] shadow-md bg-[#f9fcff]' 
+                          : 'border-[#e1f0fa] text-[#97d5fc] hover:border-[#abddfc] hover:text-[#74abcf]'
+                      }`}
+                    >
+                      <Icon size={40} strokeWidth={isActive ? 2.5 : 2} />
+                      <span className="font-black text-sm uppercase tracking-tight leading-tight">{method.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 3 & 4 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            {/* Weight */}
+            <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-6 md:p-8 flex flex-col">
+              <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-xl">3. Laundry Weight (kg)</h2>
+              <div className="flex-1 flex flex-col items-center justify-center gap-6 py-4">
+                <div className="flex items-center gap-6 bg-white py-4 px-6 rounded-full shadow-sm border-2 border-[#e1f0fa]">
+                  <button onClick={() => setWeight(w => Math.max(1, w-1))} className="bg-[#f4faff] text-[#74abcf] p-4 rounded-full hover:bg-[#abddfc] hover:text-white transition-colors active:scale-90 border-2 border-[#e1f0fa]">
+                    <Minus size={24} strokeWidth={3}/>
+                  </button>
+                  <span className="text-5xl font-black text-[#74abcf] w-24 text-center tabular-nums">{weight}</span>
+                  <button onClick={() => setWeight(w => w+1)} className="bg-[#97d5fc] text-white p-4 rounded-full hover:bg-[#74abcf] transition-colors active:scale-90 border-2 border-[#97d5fc]">
+                    <Plus size={24} strokeWidth={3}/>
+                  </button>
+                </div>
+                <p className="text-xs font-bold text-[#97d5fc] uppercase tracking-widest bg-white px-4 py-2 rounded-xl border border-[#e1f0fa]">
+                  Min charge ₱165 per 8kg
+                </p>
+              </div>
+            </div>
+
+            {/* Address */}
+            <div className={`rounded-3xl p-6 md:p-8 flex flex-col transition-all border ${
+              orderMethod === 'delivery' 
+                ? 'bg-[#f4faff] border-[#e1f0fa]' 
+                : 'bg-white border-dashed border-[#e1f0fa] opacity-60'
+            }`}>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-[#74abcf] font-black uppercase tracking-tighter text-xl">4. Address</h2>
+                {orderMethod === 'drop_off' && (
+                  <span className="text-[10px] font-black text-[#74abcf] uppercase bg-[#e1f0fa] px-3 py-1.5 rounded-lg tracking-widest">
+                    Not Required
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 flex flex-col gap-4">
+                {addresses.length > 0 && orderMethod === 'delivery' ? (
+                  addresses.map(addr => (
+                    <div 
+                      key={addr.id} 
+                      className={`bg-white rounded-2xl p-5 relative cursor-pointer transition-all ${
+                        selectedAddressId === addr.id 
+                          ? 'border-4 border-[#74abcf] shadow-md bg-[#f9fcff]' 
+                          : 'border-2 border-[#e1f0fa] hover:border-[#abddfc] shadow-sm'
+                      }`}
+                      onClick={() => setSelectedAddressId(addr.id)}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <MapPin size={18} className={selectedAddressId === addr.id ? 'text-[#74abcf]' : 'text-[#97d5fc]'} />
+                        <p className="font-black text-[#74abcf] text-lg uppercase tracking-tight">{addr.name}</p>
+                      </div>
+                      <p className="text-[#5a98bd] font-medium text-sm leading-relaxed pl-6">
+                        {addr.building_no}, {addr.street} <br/>
+                        {addr.city}, {addr.province} <br/>
+                        {addr.zip_code || ""}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex-1 flex items-center justify-center">
+                    <p className="text-[#97d5fc] font-bold text-center">No saved addresses</p>
+                  </div>
+                )}
+                <button 
+                  disabled={orderMethod === 'drop_off'} 
+                  onClick={() => navigate("/profile", {state: {tab: "addresses" } })}
+                  className="w-full bg-white border-2 border-[#abddfc] hover:bg-[#f4faff] disabled:border-[#e1f0fa] disabled:text-[#e1f0fa] disabled:bg-white text-[#74abcf] py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-all shadow-sm active:scale-95 mt-auto"
+                >
+                  + Add New Address
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 5: PAYMENT */}
+          <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-6 md:p-8">
+            <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-xl">5. Payment Method</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button 
+                onClick={() => setPaymentMethod("cod")}
+                className={`bg-white rounded-2xl p-6 flex items-center justify-between transition-all border-4 shadow-sm active:scale-95 ${
+                  paymentMethod === 'cod' 
+                    ? 'border-[#74abcf] text-[#74abcf] shadow-md bg-[#f9fcff]' 
+                    : 'border-[#e1f0fa] text-[#97d5fc] hover:border-[#abddfc] hover:text-[#74abcf]'
+                }`}
+              >
+                <span className="font-black text-lg uppercase tracking-widest">Cash on Delivery</span>
+                <Banknote size={32} strokeWidth={paymentMethod === 'cod' ? 2.5 : 2}/>
+              </button>
+              
+              <button 
+                onClick={() => setPaymentMethod("gcash")}
+                className={`bg-white rounded-2xl p-6 flex items-center justify-between transition-all border-4 shadow-sm active:scale-95 ${
+                  paymentMethod === 'gcash' 
+                    ? 'border-[#74abcf] text-[#74abcf] shadow-md bg-[#f9fcff]' 
+                    : 'border-[#e1f0fa] text-[#97d5fc] hover:border-[#abddfc] hover:text-[#74abcf]'
+                }`}
+              >
+                <span className="font-black text-lg uppercase tracking-widest">GCash</span>
+                <Smartphone size={32} strokeWidth={paymentMethod === 'gcash' ? 2.5 : 2}/>
+              </button>
+            </div>
+
+            {/* Payment method description */}
+            <div className="mt-4 bg-white rounded-2xl p-5 border-2 border-[#e1f0fa] shadow-sm flex items-start gap-3">
+              <div className="text-[#97d5fc] pt-0.5">
+                {paymentMethod === 'cod' ? <Banknote size={20} /> : <Smartphone size={20} />}
+              </div>
+              <div>
+                {paymentMethod === "cod" && (
+                  <p className="text-[#5a98bd] font-bold text-sm leading-relaxed">
+                    Pay in cash when your laundry is delivered or picked up by our staff.
+                  </p>
+                )}
+
+                {paymentMethod === "gcash" && (
+                  <p className="text-[#5a98bd] font-bold text-sm leading-relaxed">
+                    Please wait for staff confirmation before sending your payment via GCash. The QR code will be available in your Orders tab.
+                  </p>
+                )}
+
+                {!paymentMethod && (
+                  <p className="text-[#97d5fc] font-bold text-sm">
+                    Select a payment method to see instructions.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ================= STICKY SUMMARY BAR ================= */}
+        <div className="absolute bottom-0 left-0 right-0 bg-white border-t-2 border-[#e1f0fa] p-6 md:px-10 flex justify-between items-center shadow-[0_-10px_40px_-15px_rgba(116,171,207,0.15)] rounded-b-[40px]">
+          <div className="flex flex-col text-[#74abcf] leading-none">
+            <span className="text-xs font-black uppercase tracking-widest mb-2 text-[#97d5fc]">Total Estimated Cost</span>
+            <span className="text-4xl md:text-5xl font-black tracking-tighter">₱ {calculatedTotal.toFixed(2)}</span>
+          </div>
+          <button 
+            onClick={handleConfirmOrder}
+            disabled={loading || (orderMethod === 'delivery' && !selectedAddressId)}
+            className="bg-[#97d5fc] hover:bg-[#74abcf] disabled:bg-[#e1f0fa] disabled:text-[#97d5fc] disabled:active:scale-100 text-white px-8 md:px-12 py-4 rounded-2xl font-black uppercase tracking-widest text-lg transition-all shadow-lg active:scale-95 flex items-center gap-2"
+          >
+            {loading ? "Processing..." : "Confirm Order"}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
