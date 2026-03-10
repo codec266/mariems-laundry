@@ -13,7 +13,7 @@ export default function CustomerHome() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         navigate("/");
-        return
+        return;
       }
 
       const { data, error } = await supabase
@@ -35,65 +35,80 @@ export default function CustomerHome() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#abddfc] p-4 md:p-10">
-      <div className="bg-white w-full max-w-6xl min-h-150 rounded-[40px] shadow-2xl overflow-hidden flex flex-col md:flex-row border-4 border-white">
+    <div className="min-h-screen flex items-center justify-center bg-[#abddfc] p-4 md:p-8 font-sans">
+      
+      <div className="bg-white w-full max-w-5xl min-h-150 rounded-[40px] shadow-2xl overflow-hidden flex flex-col md:flex-row border-2 border-[#e1f0fa]">
         
-        {/* left */}
-        <div className="flex w-full md:w-1/2 items-center justify-center p-6">
-          <div className="max-w-62.5 md:max-w-xl w-full">
-            <img 
-              src={logo} 
-              alt="Mariem's Laundry Logo" 
-              className="w-full h-auto object-contain drop-shadow-sm"
-            />
-          </div>
+        {/* LEFT PANEL: Branding */}
+        <div className="w-full md:w-2/5 bg-[#f4faff] border-b-2 md:border-b-0 md:border-r-2 border-[#e1f0fa] flex flex-col items-center justify-center p-10 md:p-12">
+          <img 
+            src={logo} 
+            alt="Mariem's Laundry Logo" 
+            className="w-48 md:w-64 h-auto object-contain drop-shadow-md hover:scale-105 transition-transform duration-500"
+          />
         </div>
 
-        {/* right */}
-        <div className="w-full md:w-1/2 flex flex-col items-center justify-center p-8 bg-white">
-          <div className="max-w-md w-full text-center md:text-left">
-            <header className="mb-10">
-              <h2 className="text-3xl md:text-4xl font-extrabold text-[#74abcf] uppercase tracking-tighter leading-tight">
-                Welcome to <br />
-                <span className="text-[#74abcf]">Mariem's Laundry!</span>
-              </h2>
-              <p className="text-[#74abcf] mt-2 font-medium">
-                We're here to make your laundry day easy and worry-free.
-              </p>
-            </header>
-
-            {/* action grid */}
-            <div className="grid grid-cols-3 gap-4 mb-12">
-              <button 
-                onClick={() => navigate("/profile")}
-                className="flex flex-col items-center justify-center aspect-square bg-[#97d5fc] hover:bg-[#74abcf] transition-colors rounded-xl p-4 text-white group">
-                
-                <User size={40} strokeWidth={2} className="mb-2" />
-                <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest">Profile</span>
-              </button>
-
-              <button 
-                onClick={() => navigate("/place-order")}
-                className="flex flex-col items-center justify-center aspect-square bg-[#97d5fc] hover:bg-[#74abcf] transition-colors rounded-xl p-4 text-white group">
-                
-                <PlusCircle size={40} strokeWidth={2} className="mb-2" />
-                <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-center leading-tight">Place Order</span>
-              </button>
-
-              <button 
-                onClick={() => navigate("/orders")}
-                className="flex flex-col items-center justify-center aspect-square bg-[#97d5fc] hover:bg-[#74abcf] transition-colors rounded-xl p-4 text-white group">
-                <ShoppingCart size={40} strokeWidth={2} className="mb-2" />
-                <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest">Orders</span>
-              </button>
-            </div>
-
-            {/* logout */}
-            <div className="flex justify-center md:justify-end">
-              <button onClick={handleLogout} className="flex items-center gap-2 bg-[#74abcf] hover:bg-[#97d5fc] text-white px-6 py-3 rounded-lg font-bold transition-all">
-                <LogOut size={20} />Logout</button>
-            </div>
+        {/* RIGHT PANEL: Content & Actions */}
+        <div className="w-full md:w-3/5 p-8 md:p-12 lg:p-16 flex flex-col justify-center">
+          
+          {/* Header */}
+          <div className="mb-10 text-center md:text-left">
+            <h1 className="text-4xl md:text-5xl font-black text-[#74abcf] uppercase tracking-tighter mb-3 leading-none">
+              Welcome back{firstName ? `, ${firstName}` : ""}!
+            </h1>
+            <p className="text-[#5a98bd] font-medium text-sm md:text-base">
+              We're here to make your laundry day easy and worry-free. What would you like to do today?
+            </p>
           </div>
+
+          {/* Action Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 md:mb-12">
+            
+            {/* Profile Button */}
+            <button 
+              onClick={() => navigate("/profile")}
+              className="bg-white border-2 border-[#e1f0fa] hover:border-[#abddfc] hover:bg-[#f9fcff] rounded-3xl p-6 flex flex-col items-center justify-center gap-3 transition-all shadow-sm hover:shadow-md active:scale-95 group"
+            >
+              <div className="bg-[#f4faff] p-3 rounded-2xl group-hover:bg-[#abddfc] transition-colors">
+                <User size={32} strokeWidth={2.5} className="text-[#74abcf] group-hover:text-white transition-colors" />
+              </div>
+              <span className="font-black text-[#5a98bd] group-hover:text-[#74abcf] text-[11px] uppercase tracking-widest text-center transition-colors">Profile</span>
+            </button>
+
+            {/* Place Order Button (Primary Emphasis) */}
+            <button 
+              onClick={() => navigate("/place-order")}
+              className="bg-[#97d5fc] hover:bg-[#74abcf] border-2 border-[#97d5fc] hover:border-[#74abcf] rounded-3xl p-6 flex flex-col items-center justify-center gap-3 transition-all shadow-md hover:shadow-lg active:scale-95 group"
+            >
+              <div className="bg-white/20 p-3 rounded-2xl">
+                <PlusCircle size={32} strokeWidth={2.5} className="text-white" />
+              </div>
+              <span className="font-black text-white text-[11px] uppercase tracking-widest text-center leading-tight">Place Order</span>
+            </button>
+
+            {/* Orders Button */}
+            <button 
+              onClick={() => navigate("/orders")}
+              className="bg-white border-2 border-[#e1f0fa] hover:border-[#abddfc] hover:bg-[#f9fcff] rounded-3xl p-6 flex flex-col items-center justify-center gap-3 transition-all shadow-sm hover:shadow-md active:scale-95 group"
+            >
+              <div className="bg-[#f4faff] p-3 rounded-2xl group-hover:bg-[#abddfc] transition-colors">
+                <ShoppingCart size={32} strokeWidth={2.5} className="text-[#74abcf] group-hover:text-white transition-colors" />
+              </div>
+              <span className="font-black text-[#5a98bd] group-hover:text-[#74abcf] text-[11px] uppercase tracking-widest text-center transition-colors">Orders</span>
+            </button>
+
+          </div>
+
+          {/* Logout */}
+          <div className="mt-auto md:mt-0 flex justify-center md:justify-end">
+            <button 
+              onClick={handleLogout} 
+              className="w-full md:w-auto flex items-center justify-center gap-2 bg-white border-2 border-rose-100 hover:bg-rose-50 text-rose-400 px-8 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-sm active:scale-95"
+            >
+              <LogOut size={18} strokeWidth={3} /> Logout
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
