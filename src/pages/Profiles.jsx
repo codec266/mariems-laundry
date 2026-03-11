@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useNavigate, useLocation } from "react-router-dom";
-import { User, ArrowLeft, Save, Mail, MapPin, ShieldCheck, Trash2, Edit2, Plus, X, Phone, CheckCircle, AlertTriangle, Lock, Key } from "lucide-react";
+import { User, ArrowLeft, Save, Mail, MapPin, ShieldCheck, Trash2, Edit2, Plus, X, CheckCircle, AlertTriangle, Lock, Key } from "lucide-react";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -12,7 +12,6 @@ export default function Profile() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState(""); 
   const [loading, setLoading] = useState(false);
 
   // security (password)
@@ -57,7 +56,7 @@ export default function Profile() {
 
       if (addressData) setAddresses(addressData);
 
-      // fetch customer name & phone
+      // fetch customer name
       const { data } = await supabase
         .from("customers")
         .select("first_name, last_name")
@@ -381,26 +380,6 @@ export default function Profile() {
                         className="w-full px-4 py-3 border-2 border-[#e1f0fa] rounded-2xl text-[#5a98bd] font-bold outline-none focus:border-[#abddfc] focus:bg-[#f4faff] transition-colors shadow-sm" 
                         required
                       />
-                    </div>
-                  </div>
-
-                  {/* PRETTY PHONE UI */}
-                  <div className="space-y-1 pt-1">
-                    <label className="text-[#74abcf] text-[10px] font-black uppercase tracking-widest ml-1">Phone Number</label>
-                    <div className="flex shadow-sm rounded-2xl focus-within:ring-4 focus-within:ring-[#abddfc]/20 transition-all">
-                      <div className="flex items-center justify-center bg-[#f4faff] border-2 border-r-0 border-[#e1f0fa] rounded-l-2xl px-4 text-[#74abcf] font-black text-sm select-none">
-                        +63
-                      </div>
-                      <div className="relative flex-1">
-                        <Phone className="absolute right-4 top-1/2 -translate-y-1/2 text-[#b8dcf2]" size={18} strokeWidth={2.5} />
-                        <input 
-                          type="tel" 
-                          value={phone} 
-                          onChange={(e) => setPhone(e.target.value)} 
-                          placeholder="912 345 6789"
-                          className="w-full pl-4 pr-10 py-3 border-2 border-[#e1f0fa] rounded-r-2xl text-[#5a98bd] font-bold outline-none focus:border-[#abddfc] focus:bg-[#f4faff] transition-colors placeholder:text-[#b8dcf2] placeholder:font-medium" 
-                        />
-                      </div>
                     </div>
                   </div>
                 </div>

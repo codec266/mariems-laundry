@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import { User, Home, ShoppingCart, LogOut, Search, Filter, BarChart3 } from "lucide-react";
+import { User, Home, ShoppingCart, LogOut, Search, Filter, BarChart3, FileText, X, Clock, CreditCard, MapPin } from "lucide-react";
 import logo from "../assets/logo.png";
 
 export default function AdminOrderHistory() {
@@ -13,6 +13,10 @@ export default function AdminOrderHistory() {
 
   const [filterStatus, setFilterStatus] = useState("All");
   const [filterCustomer, setFilterCustomer] = useState("");
+
+  // Modal State
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedDetailsOrder, setSelectedDetailsOrder] = useState(null);
 
   const fetchOrderHistory = async () => {
     setLoading(true);
@@ -32,6 +36,7 @@ export default function AdminOrderHistory() {
 
     if (adminData) setFirstName(adminData.first_name);
 
+    // Updated Query: Added order_items, pricing_model, delivery_fee, payments, etc.
     const { data: ordersData, error } = await supabase
       .from("orders")
       .select(`
@@ -39,11 +44,16 @@ export default function AdminOrderHistory() {
         date,
         weight_kg,
         total_amount,
+        delivery_fee,
         order_status,
+        order_method,
         is_accepted,
+        payment_status,
+        payments(payment_method),
         customers(first_name,last_name),
-        service_types(service_name),
-        addresses(building_no,street,city,province,zip_code)
+        service_types(service_name, base_price, pricing_model),
+        addresses(building_no,street,city,province,zip_code),
+        order_items(quantity, unit_price, service_items(item_name))
       `)
       .order("date", { ascending: false });
 
@@ -91,7 +101,7 @@ export default function AdminOrderHistory() {
     }
 
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-bold ${colorClass}`}>
+      <span className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-wider ${colorClass} text-center shadow-sm border border-white/50`}>
         {displayStatus}
       </span>
     );
@@ -138,7 +148,7 @@ export default function AdminOrderHistory() {
             <BarChart3 size={28} strokeWidth={2.5} /> Sales Report
           </button>
 
-          <hr className="border-blue-50" />
+          <hr className="border-[#e1f0fa]" />
 
           <button onClick={handleLogout} className="flex items-center gap-4 hover:text-[#97d5fc] transition-colors">
             <LogOut size={28} strokeWidth={2.5} /> Logout
@@ -183,16 +193,16 @@ export default function AdminOrderHistory() {
 
         {/* Table */}
         <div className="w-full overflow-x-auto rounded-2xl border border-[#e1f0fa] shadow-sm bg-white">
-          <table className="w-full min-w-150 text-left text-sm text-[#5a98bd]">
+          <table className="w-full min-w-200 text-left text-sm text-[#5a98bd]">
             <thead className="bg-[#f4faff] text-[#74abcf] uppercase font-black tracking-wider text-xs border-b border-[#e1f0fa]">
               <tr>
                 <th className="py-4 px-4 md:px-6">Customer</th>
                 <th className="py-4 px-4 md:px-6">Service</th>
-                <th className="py-4 px-4 md:px-6 text-center">Weight</th>
+                <th className="py-4 px-4 md:px-6 text-center">Volume</th>
                 <th className="py-4 px-4 md:px-6 text-center">Total</th>
                 <th className="py-4 px-4 md:px-6 text-center">Status</th>
                 <th className="py-4 px-4 md:px-6">Date</th>
-                <th className="py-4 px-4 md:px-6">Address</th>
+                <th className="py-4 px-4 md:px-6 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="font-medium">
@@ -218,7 +228,7 @@ export default function AdminOrderHistory() {
                       {order.service_types?.service_name}
                     </td>
                     <td className="py-4 px-4 md:px-6 text-center whitespace-nowrap">
-                      {order.weight_kg} kg
+                      {order.weight_kg ? `${order.weight_kg} kg` : 'Per Item'}
                     </td>
                     <td className="py-4 px-4 md:px-6 text-[#74abcf] font-bold text-center whitespace-nowrap">
                       ₱{order.total_amount.toFixed(2)}
@@ -229,20 +239,14 @@ export default function AdminOrderHistory() {
                     <td className="py-4 px-4 md:px-6 text-[#74abcf] font-bold whitespace-nowrap">
                       {new Date(order.date).toLocaleDateString()}
                     </td>
-                    <td className="py-4 px-4 md:px-6 text-xs text-[#97d5fc] truncate max-w-37.5 md:max-w-62.5" title={order.addresses && [
-                        order.addresses.building_no,
-                        order.addresses.street,
-                        order.addresses.city,
-                        order.addresses.province,
-                        order.addresses.zip_code
-                      ].filter(Boolean).join(", ")}>
-                      {order.addresses && [
-                        order.addresses.building_no,
-                        order.addresses.street,
-                        order.addresses.city,
-                        order.addresses.province,
-                        order.addresses.zip_code
-                      ].filter(Boolean).join(", ")}
+                    <td className="py-4 px-4 md:px-6 text-center whitespace-nowrap">
+                      <button 
+                        onClick={() => { setSelectedDetailsOrder(order); setShowDetailsModal(true); }}
+                        className="bg-white border-2 border-[#e1f0fa] hover:border-[#abddfc] text-[#74abcf] p-2 rounded-xl transition-all shadow-sm active:scale-90"
+                        title="View Details"
+                      >
+                        <FileText size={18} strokeWidth={2.5}/>
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -252,6 +256,118 @@ export default function AdminOrderHistory() {
         </div>
 
       </div>
+
+      {/* ================= ORDER DETAILS MODAL ================= */}
+      {showDetailsModal && selectedDetailsOrder && (
+        <div className="fixed inset-0 bg-[#5a98bd]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-4xl shadow-2xl p-6 md:p-8 max-w-lg w-full relative flex flex-col gap-6 border-2 border-[#e1f0fa] animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+            
+            <button
+              className="absolute top-4 right-4 md:top-6 md:right-6 text-[#97d5fc] hover:text-[#74abcf] transition-colors bg-[#f4faff] p-2 rounded-full"
+              onClick={() => setShowDetailsModal(false)}
+            >
+              <X size={20} strokeWidth={3} />
+            </button>
+
+            <div>
+              <h2 className="text-2xl font-black text-[#74abcf] uppercase tracking-tighter mb-1">Order Summary</h2>
+              <p className="text-[#97d5fc] font-bold text-sm">#{selectedDetailsOrder.id.toString().slice(0, 8)}</p>
+            </div>
+
+            {/* Status Row */}
+            <div className="flex gap-2">
+              {getStatusBadge(selectedDetailsOrder)}
+              <span className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-wider text-center shadow-sm border border-white/50 ${
+                selectedDetailsOrder.payment_status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+              }`}>
+                Payment: {selectedDetailsOrder.payment_status}
+              </span>
+            </div>
+
+            {/* Info Grid */}
+            <div className="grid grid-cols-2 gap-4 bg-[#f4faff] p-4 rounded-2xl border border-[#e1f0fa]">
+              <div className="col-span-2">
+                <p className="text-[10px] font-black text-[#97d5fc] uppercase tracking-widest flex items-center gap-1"><User size={12}/> Customer</p>
+                <p className="font-bold text-[#5a98bd] text-sm mt-1">
+                  {selectedDetailsOrder.customers?.first_name} {selectedDetailsOrder.customers?.last_name}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-[#97d5fc] uppercase tracking-widest flex items-center gap-1"><Clock size={12}/> Date Completed</p>
+                <p className="font-bold text-[#5a98bd] text-sm mt-1">{new Date(selectedDetailsOrder.date).toLocaleDateString()}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-[#97d5fc] uppercase tracking-widest flex items-center gap-1"><CreditCard size={12}/> Payment Method</p>
+                <p className="font-bold text-[#5a98bd] text-sm mt-1">
+                  {selectedDetailsOrder.payments?.[0]?.payment_method || "N/A"}
+                </p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-[10px] font-black text-[#97d5fc] uppercase tracking-widest flex items-center gap-1"><MapPin size={12}/> Method & Location</p>
+                <p className="font-bold text-[#5a98bd] text-sm mt-1">
+                  {selectedDetailsOrder.order_method} 
+                  {selectedDetailsOrder.addresses && ` • ${[
+                      selectedDetailsOrder.addresses.building_no,
+                      selectedDetailsOrder.addresses.street,
+                      selectedDetailsOrder.addresses.city
+                    ].filter(Boolean).join(", ")}`}
+                </p>
+              </div>
+            </div>
+
+            {/* Items / Volume Details */}
+            <div className="bg-white border-2 border-[#e1f0fa] rounded-2xl p-4">
+              <h4 className="text-xs font-black text-[#74abcf] uppercase tracking-widest mb-3 border-b-2 border-dashed border-[#e1f0fa] pb-2">
+                Service Volume
+              </h4>
+              
+              {selectedDetailsOrder.service_types?.pricing_model === 'per_item' ? (
+                selectedDetailsOrder.order_items && selectedDetailsOrder.order_items.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedDetailsOrder.order_items.map((item, idx) => (
+                      <div key={idx} className="flex justify-between font-bold text-[#5a98bd] text-sm">
+                        <span>{item.quantity}x {item.service_items?.item_name || "Unknown Item"}</span>
+                        <span>₱{(Number(item.quantity) * Number(item.unit_price)).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm font-bold text-[#97d5fc]">No items detailed.</p>
+                )
+              ) : (
+                <div className="flex justify-between font-bold text-[#5a98bd] text-sm">
+                   <span>Total Weight</span>
+                   <span>{selectedDetailsOrder.weight_kg || 0} kg</span>
+                </div>
+              )}
+            </div>
+
+            {/* Summary Breakdown */}
+            <div className="bg-[#f9fcff] p-4 rounded-2xl border border-[#e1f0fa]">
+              <div className="w-full flex flex-col gap-1.5 mb-3 text-sm font-bold text-[#5a98bd]">
+                <div className="flex justify-between">
+                  <span>Service Cost:</span>
+                  <span>₱{(Number(selectedDetailsOrder.total_amount) - Number(selectedDetailsOrder.delivery_fee || 0)).toFixed(2)}</span>
+                </div>
+                {Number(selectedDetailsOrder.delivery_fee || 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span>Delivery Fee:</span>
+                    <span>₱{Number(selectedDetailsOrder.delivery_fee).toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+              <hr className="my-3 border-[#e1f0fa] border-dashed" />
+              <p className="font-black text-[#5a98bd] text-lg flex justify-between items-center">
+                Total Amount: <span className="text-[#74abcf] text-2xl">₱{Number(selectedDetailsOrder.total_amount).toFixed(2)}</span>
+              </p>
+            </div>
+
+            {/* Note: Accept/Deny buttons are removed because this is the History page */}
+            
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

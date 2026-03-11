@@ -33,6 +33,7 @@ export default function AdminSalesReport() {
       .single();
     if (adminData) setFirstName(adminData.first_name);
 
+    // Updated Query: Added pricing_model and order_items
     const { data: ordersData, error } = await supabase
       .from("orders")
       .select(`
@@ -43,8 +44,9 @@ export default function AdminSalesReport() {
         total_amount,
         order_status,
         customers(first_name,last_name),
-        service_types(service_name),
-        addresses(building_no,street,city,province,zip_code)
+        service_types(service_name, pricing_model),
+        addresses(building_no,street,city,province,zip_code),
+        order_items(quantity, unit_price, service_items(item_name))
       `)
       .eq("order_status", "Claimed")
       .order("date", { ascending: false });
@@ -109,12 +111,13 @@ export default function AdminSalesReport() {
   const handleLogout = async () => { await supabase.auth.signOut(); navigate("/"); };
   const formatMoney = v => `₱${Number(v).toFixed(2)}`;
 
-  // export csv
+  // Export CSV (Safely handles dynamic volume display)
   const exportCSV = () => {
-    const headers = ["Customer", "Service", "Weight", "Delivery Fee", "Total", "Date", "Address"];
+    const headers = ["Customer", "Service", "Volume", "Delivery Fee", "Total", "Date", "Address"];
     const rows = filteredOrders.map(o => {
       const customer = `${o.customers?.first_name || ""} ${o.customers?.last_name || ""}`;
       const service = o.service_types?.service_name || "Other";
+      const volume = o.service_types?.pricing_model === 'per_item' ? 'Per Item' : `${o.weight_kg || 0} kg`;
       const delivery = o.delivery_fee || 0;
       const address = o.addresses ? [
         o.addresses.building_no,
@@ -124,7 +127,8 @@ export default function AdminSalesReport() {
         o.addresses.zip_code
       ].filter(Boolean).join(", ") : "";
 
-      return [customer, service, o.weight_kg, delivery, o.total_amount, new Date(o.date).toLocaleDateString(), `"${address}"`];
+      // Wrapped in quotes to prevent commas in names or addresses from breaking the CSV format
+      return [`"${customer}"`, `"${service}"`, `"${volume}"`, delivery, o.total_amount, new Date(o.date).toLocaleDateString(), `"${address}"`];
     });
     const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
 
@@ -196,7 +200,7 @@ export default function AdminSalesReport() {
             <button onClick={exportCSV} className="flex-1 sm:flex-none bg-emerald-400 hover:bg-emerald-500 text-white px-5 py-3 rounded-2xl flex items-center justify-center gap-2 font-black uppercase text-xs tracking-widest transition-colors shadow-sm active:scale-95">
               <Download size={16} strokeWidth={3}/> Export
             </button>
-            <button onClick={printReport} className="flex-1 sm:flex-none w-full sm:w-auto bg-gray-300 hover:bg-gray-400 text-gray-700 px-5 py-3 rounded-2xl flex items-center justify-center gap-2 font-black uppercase text-xs tracking-widest transition-colors shadow-sm active:scale-95">
+            <button onClick={printReport} className="flex-1 sm:flex-none w-full sm:w-auto bg-white border-2 border-[#e1f0fa] hover:bg-[#f4faff] hover:border-[#abddfc] text-[#74abcf] px-5 py-3 rounded-2xl flex items-center justify-center gap-2 font-black uppercase text-xs tracking-widest transition-all shadow-sm active:scale-95">
               <Printer size={16} strokeWidth={3}/> Print
             </button>
           </div>
@@ -254,12 +258,12 @@ export default function AdminSalesReport() {
 
         {/* TABLE */}
         <div className="w-full overflow-x-auto rounded-2xl border border-[#e1f0fa] shadow-sm bg-white mb-8">
-          <table className="w-full min-w-175 text-left text-sm text-[#5a98bd]">
+          <table className="w-full min-w-200 text-left text-sm text-[#5a98bd]">
             <thead className="bg-[#f4faff] text-[#74abcf] uppercase font-black text-xs border-b border-[#e1f0fa]">
               <tr>
                 <th className="py-4 px-4 md:px-6">Customer</th>
                 <th className="py-4 px-4 md:px-6">Service</th>
-                <th className="py-4 px-4 md:px-6 text-center">Weight</th>
+                <th className="py-4 px-4 md:px-6 text-center">Volume</th>
                 <th className="py-4 px-4 md:px-6 text-center">Delivery</th>
                 <th className="py-4 px-4 md:px-6 text-center">Total</th>
                 <th className="py-4 px-4 md:px-6">Date</th>
@@ -276,7 +280,9 @@ export default function AdminSalesReport() {
                   <tr key={order.id} className="border-b border-[#e1f0fa] hover:bg-[#f9fcff] transition-colors last:border-0">
                     <td className="py-4 px-4 md:px-6 text-[#74abcf] font-bold whitespace-nowrap">{order.customers?.first_name} {order.customers?.last_name}</td>
                     <td className="py-4 px-4 md:px-6 whitespace-nowrap">{order.service_types?.service_name}</td>
-                    <td className="py-4 px-4 md:px-6 text-center whitespace-nowrap">{order.weight_kg} kg</td>
+                    <td className="py-4 px-4 md:px-6 text-center whitespace-nowrap">
+                      {order.service_types?.pricing_model === 'per_item' ? 'Per Item' : `${order.weight_kg || 0} kg`}
+                    </td>
                     <td className="py-4 px-4 md:px-6 text-center whitespace-nowrap text-[#97d5fc]">
                       ₱{Number(order.delivery_fee || 0).toFixed(2)}
                     </td>
@@ -284,7 +290,7 @@ export default function AdminSalesReport() {
                       ₱{Number(order.total_amount).toFixed(2)}
                     </td>
                     <td className="py-4 px-4 md:px-6 text-[#74abcf] font-bold whitespace-nowrap">{new Date(order.date).toLocaleDateString()}</td>
-                    <td className="py-4 px-4 md:px-6 text-xs text-[#97d5fc] truncate max-w-37.5 md:max-w-62.5" title={order.addresses && [
+                    <td className="py-4 px-4 md:px-6 text-xs text-[#97d5fc] truncate max-w-62.5" title={order.addresses && [
                         order.addresses.building_no,
                         order.addresses.street,
                         order.addresses.city,

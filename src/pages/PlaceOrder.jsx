@@ -23,29 +23,26 @@ export default function PlaceOrder() {
   
   // UI States
   const [userName, setUserName] = useState("Your Name");
-  const [selectedService, setSelectedService] = useState("wash_fold");
   const [orderMethod, setOrderMethod] = useState("delivery");
-  const [paymentMethod, setPaymentMethod] = useState("cod"); // 'cod' or 'gcash'
-  const [weight, setWeight] = useState(8); // default 8kg
+  const [paymentMethod, setPaymentMethod] = useState("cod"); 
   const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // Service States
   const [services, setServices] = useState([]); 
+  const [selectedServiceId, setSelectedServiceId] = useState("");
+  const activeService = services.find(s => s.id === selectedServiceId) || null;
 
-  // Derived
-  const activeService = services.find(s => s.id === selectedService) || { price_per_8kg: 0 };
-  const blocks = Math.ceil(weight / 8);
-  const deliveryFee = orderMethod === "delivery" ? 40 : 0; 
-  const calculatedTotal = blocks * Number(activeService.price_per_8kg) + deliveryFee;
+  // Pricing Model States: Per Load (Weight)
+  const [weight, setWeight] = useState(8); 
 
-  // fetch user info and addresses
+  // Pricing Model States: Per Item
+  const [serviceItems, setServiceItems] = useState([]); // items available for the selected service
+  const [orderItems, setOrderItems] = useState({}); // { item_id: quantity }
+
+  // Fetch initial data
   useEffect(() => {
-    const fetchServices = async () => {
-      const { data, error } = await supabase.from("service_types").select("*");
-      if (data) setServices(data);
-      if (error) console.error("Service fetch error:", error.message);
-    };
-
     const fetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -73,31 +70,86 @@ export default function PlaceOrder() {
         setAddresses(addressData);
         if (addressData.length > 0) setSelectedAddressId(addressData[0].id);
       }
+
+      // get services
+      const { data: serviceData } = await supabase.from("service_types").select("*");
+      if (serviceData && serviceData.length > 0) {
+        setServices(serviceData);
+        setSelectedServiceId(serviceData[0].id); // Default to first service
+      }
     };
-    fetchServices();
     fetchData();
   }, [navigate]);
 
+  // Fetch items when a 'per_item' service is selected
+  useEffect(() => {
+    const fetchItems = async () => {
+      if (activeService && activeService.pricing_model === 'per_item') {
+        const { data } = await supabase
+          .from("service_items")
+          .select("*")
+          .eq("service_type_id", activeService.id);
+        
+        if (data) {
+          setServiceItems(data);
+          setOrderItems({}); // Reset cart when changing services
+        }
+      }
+    };
+    fetchItems();
+  }, [activeService]);
+
+  // Handlers for Per Item Cart
+  const handleItemQuantityChange = (itemId, delta) => {
+    setOrderItems(prev => {
+      const currentQty = prev[itemId] || 0;
+      const newQty = Math.max(0, currentQty + delta);
+      const updated = { ...prev, [itemId]: newQty };
+      if (newQty === 0) delete updated[itemId];
+      return updated;
+    });
+  };
+
+  // Dynamic Total Calculation
+  const deliveryFee = orderMethod === "delivery" ? 40 : 0; 
+  let serviceTotal = 0;
+
+  if (activeService?.pricing_model === 'per_item') {
+    // Sum up the specific items
+    serviceTotal = Object.entries(orderItems).reduce((sum, [itemId, qty]) => {
+      const item = serviceItems.find(i => i.id === itemId);
+      return sum + (item ? Number(item.price) * qty : 0);
+    }, 0);
+  } else {
+    // Default to per_load calculation (blocks of 8kg)
+    const blocks = Math.ceil(weight / 8);
+    serviceTotal = blocks * Number(activeService?.base_price || 0);
+  }
+
+  const calculatedTotal = serviceTotal + deliveryFee;
+  const isOrderValid = activeService?.pricing_model === 'per_item' ? Object.keys(orderItems).length > 0 : true;
+
   // Place order
   const handleConfirmOrder = async () => {
+    if (!isOrderValid) {
+      alert("Please add at least one item to your order.");
+      return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     setLoading(true);
 
-    const service = services.find(s => s.id === selectedService);
-    if (!service) {
-      setLoading(false);
-      alert("Please input a valid service.");
-      return;
-    }
+    const isPerItem = activeService.pricing_model === 'per_item';
 
+    // 1. Create the Main Order
     const { data: newOrder, error: orderError } = await supabase
       .from("orders").insert([{
         customer_id: user.id,
         address_id: orderMethod === "delivery" ? selectedAddressId : null,
-        service_type_id: selectedService,
-        weight_kg: weight,
+        service_type_id: selectedServiceId,
+        weight_kg: isPerItem ? null : weight, // Nullable for per_item
         total_amount: calculatedTotal,
         delivery_fee: deliveryFee,        
         order_status: "Pending",
@@ -115,6 +167,27 @@ export default function PlaceOrder() {
       return;
     }
 
+    // 2. If Per Item, Insert Order Items
+    if (isPerItem) {
+      const itemsToInsert = Object.entries(orderItems).map(([itemId, qty]) => {
+        const itemDef = serviceItems.find(i => i.id === itemId);
+        return {
+          order_id: newOrder.id,
+          service_item_id: itemId,
+          quantity: qty,
+          unit_price: itemDef.price
+        };
+      });
+
+      const { error: itemsError } = await supabase.from("order_items").insert(itemsToInsert);
+      
+      if (itemsError) {
+        console.error("Items insert error:", itemsError.message);
+        // Note: You might want to implement rollback logic here in a real production app
+      }
+    }
+
+    // 3. Create Payment Record
     const { error: paymentError } = await supabase.from("payments").insert([{
       order_id: newOrder.id,
       amount_paid: calculatedTotal,
@@ -128,6 +201,7 @@ export default function PlaceOrder() {
       alert("Order placed, but payment record failed. Check console.");
       return;
     }
+
     alert("Order placed successfully!");
     navigate("/orders");
   };
@@ -189,13 +263,14 @@ export default function PlaceOrder() {
               <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-lg md:text-xl">1. Service Type</h2>
               <div className="grid grid-cols-2 gap-3 md:gap-4">
                 {services.map(service => {
-                  const Icon = serviceIcons[service.id] || Shirt;
-                  const isActive = selectedService === service.id;
+                  // Fallback icon based on name matching
+                  const Icon = service.service_name.toLowerCase().includes('dry') ? Sparkles : Shirt;
+                  const isActive = selectedServiceId === service.id;
 
                   return (
                     <button
                       key={service.id}
-                      onClick={() => setSelectedService(service.id)}
+                      onClick={() => setSelectedServiceId(service.id)}
                       className={`bg-white rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 md:gap-3 transition-all border-4 shadow-sm active:scale-95 ${
                         isActive 
                           ? 'border-[#74abcf] text-[#74abcf] shadow-md bg-[#f9fcff]' 
@@ -240,24 +315,59 @@ export default function PlaceOrder() {
           {/* SECTION 3 & 4 */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             
-            {/* Weight */}
-            <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-5 md:p-8 flex flex-col">
-              <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-lg md:text-xl">3. Laundry Weight (kg)</h2>
-              <div className="flex-1 flex flex-col items-center justify-center gap-6 py-4">
-                <div className="flex items-center gap-4 sm:gap-6 bg-white py-3 px-4 sm:py-4 sm:px-6 rounded-full shadow-sm border-2 border-[#e1f0fa]">
-                  <button onClick={() => setWeight(w => Math.max(1, w-1))} className="bg-[#f4faff] text-[#74abcf] p-3 sm:p-4 rounded-full hover:bg-[#abddfc] hover:text-white transition-colors active:scale-90 border-2 border-[#e1f0fa]">
-                    <Minus size={20} strokeWidth={3}/>
-                  </button>
-                  <span className="text-4xl sm:text-5xl font-black text-[#74abcf] w-20 sm:w-24 text-center tabular-nums">{weight}</span>
-                  <button onClick={() => setWeight(w => w+1)} className="bg-[#97d5fc] text-white p-3 sm:p-4 rounded-full hover:bg-[#74abcf] transition-colors active:scale-90 border-2 border-[#97d5fc]">
-                    <Plus size={20} strokeWidth={3}/>
-                  </button>
+            {/* DYNAMIC SECTION: Weight OR Items based on Pricing Model */}
+            {activeService?.pricing_model === 'per_item' ? (
+              // PER ITEM UI (Dry Cleaning)
+              <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-5 md:p-8 flex flex-col">
+                <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-lg md:text-xl">3. Select Items</h2>
+                <div className="flex-1 flex flex-col gap-3 max-h-64 overflow-y-auto pr-2">
+                  {serviceItems.length === 0 ? (
+                     <p className="text-[#97d5fc] font-bold text-center py-4">Loading items...</p>
+                  ) : (
+                    serviceItems.map(item => {
+                      const qty = orderItems[item.id] || 0;
+                      return (
+                        <div key={item.id} className="flex justify-between items-center bg-white p-3 rounded-2xl border-2 border-[#e1f0fa] shadow-sm">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-[#74abcf]">{item.item_name}</span>
+                            <span className="text-xs font-black text-[#97d5fc]">₱{Number(item.price).toFixed(2)}</span>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                             <button onClick={() => handleItemQuantityChange(item.id, -1)} className="bg-[#f4faff] text-[#74abcf] p-1.5 rounded-lg hover:bg-[#abddfc] hover:text-white transition-colors active:scale-90 border border-[#e1f0fa]">
+                              <Minus size={16} strokeWidth={3}/>
+                            </button>
+                            <span className="font-black text-[#74abcf] w-4 text-center tabular-nums">{qty}</span>
+                            <button onClick={() => handleItemQuantityChange(item.id, 1)} className="bg-[#97d5fc] text-white p-1.5 rounded-lg hover:bg-[#74abcf] transition-colors active:scale-90 border border-[#97d5fc]">
+                              <Plus size={16} strokeWidth={3}/>
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
                 </div>
-                <p className="text-[10px] md:text-xs font-bold text-[#97d5fc] uppercase tracking-widest bg-white px-4 py-2 rounded-xl border border-[#e1f0fa]">
-                  Min charge ₱165 per 8kg
-                </p>
               </div>
-            </div>
+            ) : (
+              // PER LOAD UI (Wash & Fold)
+              <div className="bg-[#f4faff] border border-[#e1f0fa] rounded-3xl p-5 md:p-8 flex flex-col">
+                <h2 className="text-[#74abcf] font-black uppercase tracking-tighter mb-4 text-lg md:text-xl">3. Laundry Weight (kg)</h2>
+                <div className="flex-1 flex flex-col items-center justify-center gap-6 py-4">
+                  <div className="flex items-center gap-4 sm:gap-6 bg-white py-3 px-4 sm:py-4 sm:px-6 rounded-full shadow-sm border-2 border-[#e1f0fa]">
+                    <button onClick={() => setWeight(w => Math.max(1, w-1))} className="bg-[#f4faff] text-[#74abcf] p-3 sm:p-4 rounded-full hover:bg-[#abddfc] hover:text-white transition-colors active:scale-90 border-2 border-[#e1f0fa]">
+                      <Minus size={20} strokeWidth={3}/>
+                    </button>
+                    <span className="text-4xl sm:text-5xl font-black text-[#74abcf] w-20 sm:w-24 text-center tabular-nums">{weight}</span>
+                    <button onClick={() => setWeight(w => w+1)} className="bg-[#97d5fc] text-white p-3 sm:p-4 rounded-full hover:bg-[#74abcf] transition-colors active:scale-90 border-2 border-[#97d5fc]">
+                      <Plus size={20} strokeWidth={3}/>
+                    </button>
+                  </div>
+                  <p className="text-[10px] md:text-xs font-bold text-[#97d5fc] uppercase tracking-widest bg-white px-4 py-2 rounded-xl border border-[#e1f0fa]">
+                    Min charge ₱{activeService?.base_price || 165} per 8kg
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Address */}
             <div className={`rounded-3xl p-5 md:p-8 flex flex-col transition-all border ${
@@ -358,12 +468,6 @@ export default function PlaceOrder() {
                     Please wait for staff confirmation before sending your payment via GCash. The QR code will be available in your Orders tab.
                   </p>
                 )}
-
-                {!paymentMethod && (
-                  <p className="text-[#97d5fc] font-bold text-xs md:text-sm">
-                    Select a payment method to see instructions.
-                  </p>
-                )}
               </div>
             </div>
           </div>
@@ -396,7 +500,7 @@ export default function PlaceOrder() {
           
           <button 
             onClick={handleConfirmOrder}
-            disabled={loading || (orderMethod === 'delivery' && !selectedAddressId)}
+            disabled={loading || !isOrderValid || (orderMethod === 'delivery' && !selectedAddressId)}
             className="w-full md:w-auto bg-[#97d5fc] hover:bg-[#74abcf] disabled:bg-[#e1f0fa] disabled:text-[#97d5fc] disabled:active:scale-100 text-white px-8 md:px-12 py-4 rounded-2xl font-black uppercase tracking-widest text-base md:text-lg transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 shrink-0"
           >
             {loading ? "Processing..." : "Confirm Order"}
