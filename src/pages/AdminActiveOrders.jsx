@@ -202,11 +202,17 @@ export default function AdminActiveOrders() {
     }
   };
 
-  const updateStatus = async (orderId, status) => {
+  // Prevent claiming an unpaid order
+  const updateStatus = async (order, status) => {
+    if (status === "Claimed" && order.payment_status !== "Paid") {
+      alert("Cannot mark order as Claimed because it has not been paid yet.");
+      return;
+    }
+
     const { error } = await supabase
       .from("orders")
       .update({ order_status: status })
-      .eq("id", orderId);
+      .eq("id", order.id);
 
     if (!error) fetchOrders();
   };
@@ -473,7 +479,7 @@ export default function AdminActiveOrders() {
                       </p>
                     </div>
 
-                    {/* --- PAYMENT VERIFICATION UI --- */}
+                    {/* --- PAYMENT VERIFICATION UI (GCASH) --- */}
                     {order.payment_status === "Verifying" && order.payment_proof_url && (
                       <div className="bg-white border-2 border-blue-200 rounded-2xl p-3 flex flex-col gap-2 shadow-sm">
                         <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest text-center">Verify Payment</p>
@@ -501,6 +507,24 @@ export default function AdminActiveOrders() {
                             <X size={18} strokeWidth={3} />
                           </button>
                         </div>
+                      </div>
+                    )}
+
+                    {/* --- PAYMENT VERIFICATION UI (CASH) --- */}
+                    {order.payments?.some(p => p.payment_method === "Cash") && order.payment_status === "Unpaid" && (
+                      <div className="bg-white border-2 border-emerald-200 rounded-2xl p-3 flex flex-col gap-2 shadow-sm">
+                        <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest text-center">Verify Cash Payment</p>
+                        <button
+                          onClick={() => {
+                            if (window.confirm("Confirm that you have received the cash payment?")) {
+                              handlePaymentAction(order.id, "Paid");
+                            }
+                          }}
+                          className="w-full bg-emerald-400 hover:bg-emerald-500 text-white py-2.5 rounded-xl flex items-center justify-center transition-colors shadow-sm font-black uppercase text-[10px] tracking-widest gap-1.5 active:scale-95"
+                          title="Mark as Paid"
+                        >
+                          <Check size={16} strokeWidth={3} /> Mark Paid
+                        </button>
                       </div>
                     )}
 
@@ -545,7 +569,7 @@ export default function AdminActiveOrders() {
                             <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-[#97d5fc] pointer-events-none" size={20} />
                             <select
                               value={order.order_status}
-                              onChange={e => updateStatus(order.id, e.target.value)}
+                              onChange={e => updateStatus(order, e.target.value)}
                               className="w-full bg-white border-2 border-[#e1f0fa] hover:border-[#abddfc] text-[#5a98bd] font-bold px-4 py-3 rounded-xl text-sm appearance-none cursor-pointer transition-colors shadow-sm focus:outline-none focus:border-[#74abcf]"
                             >
                               <option value="Pending">Status: Pending</option>
@@ -556,7 +580,9 @@ export default function AdminActiveOrders() {
                               {order.order_method === "Delivery" && (
                                 <option value="Out for Delivery">Status: Out for Delivery</option>
                               )}
-                              <option value="Claimed">Status: Claimed</option>
+                              <option value="Claimed" disabled={order.payment_status !== "Paid"}>
+                                {order.payment_status !== "Paid" ? "Status: Claimed (Needs Payment)" : "Status: Claimed"}
+                              </option>
                             </select>
                           </div>
 
