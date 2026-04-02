@@ -1,9 +1,9 @@
 <div align="center">
-<h1>🧺 Mariem’s Laundry Order Management System</h1>
-<a href="#"><img src="https://img.shields.io/badge/status-active-blue?style=for-the-badge"/></a> 
-<a href="#"><img src="https://img.shields.io/badge/frontend-React-61DAFB?style=for-the-badge&logo=react&logoColor=black"/></a>
-<a href="#"><img src="https://img.shields.io/badge/styling-Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white"/>
-</a> <a href="#"><img src="https://img.shields.io/badge/backend-Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white"/></a> <a href="#"><img src="https://img.shields.io/badge/deploy-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white"/></a>
+  <h1>🧺 Mariem’s Laundry Order Management System</h1>
+  <a href="#"><img src="https://img.shields.io/badge/frontend-React-61DAFB?style=for-the-badge&logo=react&logoColor=black"/></a>
+  <a href="#"><img src="https://img.shields.io/badge/styling-Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white"/></a> 
+  <a href="#"><img src="https://img.shields.io/badge/backend-Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white"/></a> 
+  <a href="#"><img src="https://img.shields.io/badge/deploy-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white"/></a>
 </div><br>
 
 
