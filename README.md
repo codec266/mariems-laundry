@@ -47,7 +47,7 @@
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/yourusername/mariems-laundry.git
+git clone https://github.com/codec266/mariems-laundry.git
 cd mariems-laundry
 ```
 
